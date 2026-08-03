@@ -15,9 +15,19 @@ func _initialize() -> void:
 
 
 func _run_all() -> void:
+	TestAssert.reset()
 	var total := 0
 	for suite_script in TEST_SUITES:
 		var suite: TestCase = suite_script.new()
 		total += suite.run()
+
+	var failures := TestAssert.failure_count()
+	if failures > 0:
+		print("FAIL: %d failures across %d tests" % [failures, total])
+		for failure_message in TestAssert.failures():
+			print("  - " + failure_message)
+		quit(1)
+		return
+
 	print("PASS: %d tests" % total)
 	quit(0)
