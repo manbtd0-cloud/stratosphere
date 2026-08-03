@@ -2,6 +2,9 @@ extends SceneTree
 
 const TEST_SUITES := [
 	preload("res://tests/unit/test_project_bootstrap.gd"),
+	preload("res://tests/unit/test_pilot_command.gd"),
+	preload("res://tests/unit/test_atmosphere_model.gd"),
+	preload("res://tests/unit/test_flight_model.gd"),
 ]
 
 
