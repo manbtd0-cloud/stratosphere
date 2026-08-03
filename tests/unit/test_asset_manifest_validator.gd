@@ -44,6 +44,10 @@ func test_manifest_generation_paths_are_repository_relative() -> void:
 
 	TestAssert.is_equal(
 		manifest.get("generator"),
+		"tools/blender/build_vtol_blockout.py"
+	)
+	TestAssert.is_equal(
+		manifest.get("geometry_module"),
 		"tools/blender/generate_vtol_blockout.py"
 	)
 	TestAssert.is_equal(
