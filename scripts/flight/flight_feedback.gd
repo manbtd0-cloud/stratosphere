@@ -17,6 +17,7 @@ var _engine_audio: AudioStreamPlayer3D
 var _wind_audio: AudioStreamPlayer3D
 var _engine_playback: AudioStreamGeneratorPlayback
 var _wind_playback: AudioStreamGeneratorPlayback
+var _connected_craft: FrontierVtolController
 
 
 static func calculate_engine_intensity(
@@ -48,13 +49,37 @@ func _ready() -> void:
 	_engine_audio = get_node_or_null(engine_audio_path) as AudioStreamPlayer3D
 	_wind_audio = get_node_or_null(wind_audio_path) as AudioStreamPlayer3D
 
-	var craft := get_parent() as FrontierVtolController
-	if craft != null and not craft.telemetry_updated.is_connected(update_from_telemetry):
-		craft.telemetry_updated.connect(update_from_telemetry)
+	_connected_craft = get_parent() as FrontierVtolController
+	if (
+		_connected_craft != null
+		and not _connected_craft.telemetry_updated.is_connected(update_from_telemetry)
+	):
+		_connected_craft.telemetry_updated.connect(update_from_telemetry)
 
 	_start_generator(_engine_audio)
 	_start_generator(_wind_audio)
 	_refresh_exhausts()
+
+
+func _exit_tree() -> void:
+	if (
+		is_instance_valid(_connected_craft)
+		and _connected_craft.telemetry_updated.is_connected(update_from_telemetry)
+	):
+		_connected_craft.telemetry_updated.disconnect(update_from_telemetry)
+
+	if is_instance_valid(_engine_audio):
+		_engine_audio.stop()
+	if is_instance_valid(_wind_audio):
+		_wind_audio.stop()
+
+	_engine_playback = null
+	_wind_playback = null
+	_engine_audio = null
+	_wind_audio = null
+	_left_exhaust = null
+	_right_exhaust = null
+	_connected_craft = null
 
 
 func _process(_delta: float) -> void:
