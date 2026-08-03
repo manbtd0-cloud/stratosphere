@@ -1,10 +1,11 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/craft/frontier_vtol.tscn" id="1_craft"]
 [ext_resource type="Script" path="res://scripts/input/pilot_input_adapter.gd" id="2_input"]
 [ext_resource type="PackedScene" path="res://scenes/craft/flight_camera_rig.tscn" id="3_camera"]
 [ext_resource type="Script" path="res://scripts/game/flight_room_controller.gd" id="4_room"]
 [ext_resource type="Script" path="res://scripts/game/route_gate.gd" id="5_gate"]
+[ext_resource type="PackedScene" path="res://scenes/ui/flight_hud.tscn" id="6_hud"]
 
 [sub_resource type="Environment" id="Environment_bootstrap"]
 background_mode = 1
@@ -82,6 +83,8 @@ script = ExtResource("2_input")
 
 [node name="FlightCameraRig" parent="." instance=ExtResource("3_camera")]
 craft_path = NodePath("../FrontierVTOL")
+
+[node name="FlightHud" parent="." instance=ExtResource("6_hud")]
 
 [node name="Route" type="Node3D" parent="."]
 
