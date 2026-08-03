@@ -103,6 +103,10 @@ func is_landing_zone_occupied() -> bool:
 	return _landing_zone_occupied
 
 
+func is_pilot_control_enabled() -> bool:
+	return _state == STATE_FLYING
+
+
 func get_state() -> int:
 	return _state
 
@@ -132,8 +136,8 @@ func _collect_route_gates() -> void:
 
 
 func _connect_runtime_signals() -> void:
-	if _input_adapter != null and _craft != null:
-		_connect_once(_input_adapter.command_updated, _craft.set_pilot_command)
+	if _input_adapter != null:
+		_connect_once(_input_adapter.command_updated, _on_pilot_command_updated)
 	if _input_adapter != null and _camera_rig != null:
 		_connect_once(_input_adapter.camera_toggle_requested, _camera_rig.toggle_mode)
 	if _input_adapter != null:
@@ -165,6 +169,8 @@ func _set_state(value: int) -> void:
 	if _state == value:
 		return
 	_state = value
+	if not is_pilot_control_enabled() and _craft != null:
+		_craft.set_pilot_command(PilotCommand.new())
 	_refresh_gate_states()
 	state_changed.emit(_state)
 
@@ -185,6 +191,15 @@ func _gate_index_before(left: RouteGate, right: RouteGate) -> bool:
 func _connect_once(signal_value: Signal, callable_value: Callable) -> void:
 	if not signal_value.is_connected(callable_value):
 		signal_value.connect(callable_value)
+
+
+func _on_pilot_command_updated(command: PilotCommand) -> void:
+	if _craft == null:
+		return
+	if is_pilot_control_enabled():
+		_craft.set_pilot_command(command)
+	else:
+		_craft.set_pilot_command(PilotCommand.new())
 
 
 func _on_landing_body_entered(body: Node3D) -> void:
