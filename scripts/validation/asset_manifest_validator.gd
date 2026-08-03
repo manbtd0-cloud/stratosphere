@@ -62,9 +62,9 @@ static func validate_path(path: String) -> Dictionary:
 
 	_validate_dimensions(manifest.get("dimensions_m", {}), errors)
 	_validate_license(manifest.get("license", {}), errors)
-	_validate_repository_path(manifest.get("generator", ""), ".py", "generator", errors)
-	_validate_repository_path(manifest.get("source_blend", ""), ".blend", "source_blend", errors)
-	_validate_repository_path(manifest.get("runtime_glb", ""), ".glb", "runtime_glb", errors)
+	_validate_repository_file(manifest.get("generator", ""), ".py", "generator", errors)
+	_validate_repository_file(manifest.get("source_blend", ""), ".blend", "source_blend", errors)
+	_validate_repository_file(manifest.get("runtime_glb", ""), ".glb", "runtime_glb", errors)
 
 	var required_nodes: Variant = manifest.get("required_nodes", [])
 	if not required_nodes is Array:
@@ -98,7 +98,7 @@ static func _validate_license(value: Variant, errors: Array[String]) -> void:
 		errors.append("license.commercial_use must be true")
 
 
-static func _validate_repository_path(
+static func _validate_repository_file(
 	value: Variant,
 	required_suffix: String,
 	field_name: String,
@@ -110,5 +110,15 @@ static func _validate_repository_path(
 		return
 	if path.is_absolute_path() or path.begins_with("res://") or path.contains(".."):
 		errors.append("%s must be repository-relative" % field_name)
+		return
 	if not path.ends_with(required_suffix):
 		errors.append("%s must end with %s" % [field_name, required_suffix])
+
+	var resolved_path := "res://" + path
+	if not FileAccess.file_exists(resolved_path):
+		errors.append("%s file is missing: %s" % [field_name, path])
+		return
+
+	var file := FileAccess.open(resolved_path, FileAccess.READ)
+	if file == null or file.get_length() <= 0:
+		errors.append("%s file is empty or unreadable: %s" % [field_name, path])
