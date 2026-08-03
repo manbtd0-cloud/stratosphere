@@ -1,78 +1,62 @@
 # Phase 0–1 Flight-Room Prototype Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` to implement this plan task by task. Every task is test-first and ends in a focused commit.
 
-**Goal:** Build a Windows-first Godot prototype where one transformable VTOL can take off, hover, transition into forward flight, fly an ordered route, land, switch between cockpit and chase cameras, restart reliably, and pass automated headless verification.
+**Goal:** Produce a Windows-first playable Godot prototype in which one blockout transformable VTOL can take off, hover, transition into forward flight, complete a short route, land, switch between cockpit and chase cameras, crash, and restart reliably.
 
-**Architecture:** Deterministic flight math lives in pure `RefCounted` classes. A single `RigidBody3D` adapter applies forces and exposes telemetry. Input, cameras, mission flow, HUD, generated art, environment feedback, and validation remain separate modules with narrow interfaces.
+**Architecture:** Keep flight mathematics in deterministic `RefCounted` classes. Apply their output through one `RigidBody3D` controller using `custom_integrator = true`, so gravity and drag are never applied twice. Keep input, camera, HUD, route state, feedback, generated art, validation, and export tooling isolated behind narrow interfaces.
 
-**Tech Stack:** Godot 4.7.1, GDScript 2.0, Blender 5.2-compatible Python, Python 3.12, PowerShell 7, Windows 10/11.
+**Tech stack:** Godot 4.6.3 stable, GDScript 2.0, Blender 5.2-compatible Python, Python 3.12, and PowerShell 7.
 
-## Global Constraints
+## Global constraints
 
-- Target Windows PC using the Godot GL Compatibility renderer for this milestone.
-- Primary controls are keyboard and mouse.
+- Windows PC is the primary target.
+- Keyboard and mouse are the primary input.
 - Cockpit and chase cameras are both first-class.
-- Player never leaves the craft.
-- Physics runs at 120 Hz.
-- Flight preserves mass, momentum, gravity, thrust direction, drag, lift approximation, and limited control authority.
-- Beginner defaults must permit takeoff and route completion without reading a manual.
-- No multiplayer, on-foot gameplay, progression economy, combat, open-world streaming, horror focus, or additional player vehicles in Phase 0–1.
-- No third-party test add-on; the repository owns a small headless runner.
-- Every task follows red → green → refactor and ends in one focused commit.
+- The player never leaves the craft.
+- Flight must preserve momentum, mass, thrust direction, gravity, aerodynamic drag, and limited control authority.
+- Beginner assistance may stabilize the craft but may not secretly replace the physical simulation.
+- Phase 0–1 contains one craft, one route, one test region, and one landing zone.
+- No multiplayer, on-foot mode, open-world streaming, economy, combat campaign, or final art in this milestone.
+- No third-party Godot testing add-on; the repository owns a small headless runner.
+- Do not upgrade the engine baseline during this milestone.
 
-## File Map
-
-```text
-project.godot
-export_presets.cfg
-.github/workflows/verify.yml
-assets/generated/vtol_blockout.glb
-assets/generated/vtol_blockout.asset.json
-assets/source/vtol_blockout.blend
-scenes/craft/frontier_vtol.tscn
-scenes/craft/flight_camera_rig.tscn
-scenes/flight_room/flight_room.tscn
-scenes/flight_room/flight_room_environment.tscn
-scenes/ui/flight_hud.tscn
-scripts/camera/flight_camera_rig.gd
-scripts/environment/flight_room_environment.gd
-scripts/flight/atmosphere_model.gd
-scripts/flight/flight_force_result.gd
-scripts/flight/flight_model.gd
-scripts/flight/flight_parameters.gd
-scripts/flight/frontier_vtol_controller.gd
-scripts/flight/pilot_command.gd
-scripts/game/flight_room_controller.gd
-scripts/game/landing_zone.gd
-scripts/game/route_gate.gd
-scripts/input/pilot_input_adapter.gd
-scripts/ui/flight_hud.gd
-scripts/validation/asset_manifest_validator.gd
-scripts/validation/project_contract_validator.gd
-tests/test_runner.gd
-tests/support/test_assert.gd
-tests/support/test_case.gd
-tests/unit/*.gd
-tests/integration/*.gd
-tools/blender/generate_vtol_blockout.py
-tools/verify/verify.py
-tools/verify/verify.ps1
-```
-
-## Stable Interfaces
+## Stable interfaces
 
 ```gdscript
 class_name PilotCommand
 extends RefCounted
-var pitch := 0.0
-var yaw := 0.0
-var roll := 0.0
-var collective := 0.0
-var strafe := Vector3.ZERO
-var transition := 0.0
-var brake := 0.0
+var pitch: float
+var yaw: float
+var roll: float
+var collective: float
+var strafe: Vector3
+var transition: float
+var brake: float
 func sanitized() -> PilotCommand
+
+class_name FlightParameters
+extends Resource
+@export var mass_kg: float
+@export var hover_thrust_newtons: float
+@export var forward_thrust_newtons: float
+@export var lateral_thrust_newtons: float
+@export var pitch_torque_newton_meters: float
+@export var yaw_torque_newton_meters: float
+@export var roll_torque_newton_meters: float
+@export var reference_area_m2: float
+@export var drag_coefficient: float
+@export var lift_coefficient: float
+@export var max_forward_speed_mps: float
+@export var stability_strength: float
+
+class_name FlightForceResult
+extends RefCounted
+var force_world: Vector3
+var torque_world: Vector3
+var lift_newtons: float
+var drag_newtons: float
+var thrust_newtons: float
 
 class_name FlightModel
 extends RefCounted
@@ -94,693 +78,220 @@ signal landed()
 func set_pilot_command(command: PilotCommand) -> void
 func reset_to(transform_value: Transform3D) -> void
 func get_telemetry() -> Dictionary
-
-class_name FlightCameraRig
-extends Node3D
-const MODE_COCKPIT := 0
-const MODE_CHASE := 1
-func bind_to_craft(craft: FrontierVtolController) -> void
-func toggle_mode() -> void
-func set_mode(mode: int) -> void
-
-class_name FlightRoomController
-extends Node3D
-const STATE_FLYING := 0
-const STATE_CRASHED := 1
-const STATE_COMPLETE := 2
-func restart_run() -> void
-func register_gate(gate_index: int) -> void
-func register_landing() -> void
 ```
 
 ---
 
-### Task 1: Bootstrap the Godot Project and Test Harness
+### Task 1: Bootstrap a green Godot repository
 
-**Files:**
-- Create: `.gitignore`
-- Create: `.gitattributes`
-- Create: `README.md`
-- Create: `project.godot`
-- Create: `scenes/flight_room/flight_room.tscn`
-- Create: `tests/support/test_assert.gd`
-- Create: `tests/support/test_case.gd`
-- Create: `tests/test_runner.gd`
-- Create: `tests/unit/test_project_bootstrap.gd`
-- Create: `tools/verify/verify.py`
-- Create: `tools/verify/verify.ps1`
+**Create:** `.gitignore`, `.gitattributes`, `README.md`, `project.godot`, `scenes/flight_room/flight_room.tscn`, `tests/support/test_assert.gd`, `tests/support/test_case.gd`, `tests/test_runner.gd`, `tests/unit/test_project_bootstrap.gd`, `tools/verify/verify.py`, `tools/verify/verify.ps1`.
 
-**Produces:** A clean-checkout project that imports headlessly and runs repository-owned tests.
+- [ ] Write bootstrap tests asserting project name and a 120 Hz physics tick rate.
+- [ ] Create a minimal valid `Node3D` main scene with a current camera and directional light.
+- [ ] Create a `SceneTree` test runner that preloads suites, runs methods beginning with `test_`, prints the count, and exits nonzero on assertion failure.
+- [ ] Make `verify.py` locate Godot from `GODOT_BIN`, PATH, or `C:\Tools\Godot\godot.exe`; import the project; then run the test runner.
+- [ ] Run `pwsh ./tools/verify/verify.ps1`.
 
-- [ ] **Step 1: Write the failing bootstrap test**
+**Expected:** import succeeds and `PASS: 2 tests` is printed.
 
-```gdscript
-extends TestCase
+**Commit:** `chore: bootstrap Godot project and verification harness`
 
-func test_project_name() -> void:
-    TestAssert.is_equal(
-        ProjectSettings.get_setting("application/config/name"),
-        "STRATOSPHERE: Frontier Vector"
-    )
+---
 
-func test_physics_tick_rate() -> void:
-    TestAssert.is_equal(
-        ProjectSettings.get_setting("physics/common/physics_ticks_per_second"),
-        120
-    )
-```
+### Task 2: Add deterministic timing
 
-- [ ] **Step 2: Run verification and confirm failure**
-
-Run:
-
-```powershell
-pwsh ./tools/verify/verify.ps1
-```
-
-Expected: failure because the verification scripts and Godot project do not exist.
-
-- [ ] **Step 3: Implement the minimal project settings**
-
-```ini
-[application]
-config/name="STRATOSPHERE: Frontier Vector"
-run/main_scene="res://scenes/flight_room/flight_room.tscn"
-config/features=PackedStringArray("4.7", "GL Compatibility")
-
-[display]
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/stretch/mode="canvas_items"
-
-[physics]
-common/physics_ticks_per_second=120
-common/max_physics_steps_per_frame=8
-
-[rendering]
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
-```
-
-- [ ] **Step 4: Implement the test utilities**
+**Create:** `scripts/core/simulation_clock.gd`, `tests/unit/test_simulation_clock.gd`.
 
 ```gdscript
-# tests/support/test_assert.gd
-class_name TestAssert
+class_name SimulationClock
 extends RefCounted
-
-static func is_true(value: bool, message := "Expected true") -> void:
-    if not value:
-        push_error(message)
-        assert(value, message)
-
-static func is_equal(actual: Variant, expected: Variant, message := "") -> void:
-    var resolved := message if not message.is_empty() else "Expected %s, got %s" % [expected, actual]
-    assert(actual == expected, resolved)
-
-static func is_near(actual: float, expected: float, tolerance: float, message := "") -> void:
-    var resolved := message if not message.is_empty() else "Expected %f ± %f, got %f" % [expected, tolerance, actual]
-    assert(absf(actual - expected) <= tolerance, resolved)
+func _init(ticks_per_second: float) -> void
+func advance(real_delta: float) -> int
+func get_alpha() -> float
 ```
 
-```gdscript
-# tests/support/test_case.gd
-class_name TestCase
-extends RefCounted
+- [ ] Test that one 60 Hz frame yields two 120 Hz ticks.
+- [ ] Test that partial time remains buffered.
+- [ ] Test that negative delta produces zero ticks.
+- [ ] Implement an accumulator with a 0.25-second frame clamp.
+- [ ] Run the full verification suite.
 
-func run() -> int:
-    var count := 0
-    for method in get_method_list():
-        var name: String = method.name
-        if name.begins_with("test_"):
-            call(name)
-            count += 1
-    return count
-```
-
-- [ ] **Step 5: Implement the runner and verification commands**
-
-`tests/test_runner.gd` must instantiate `TestProjectBootstrap`, print `PASS: 2 tests`, and quit with code `0`. `verify.py` must resolve Godot from `GODOT_BIN`, `godot`, `godot4`, or `C:\Tools\Godot\godot.exe`, run `--headless --editor --quit-after 2`, then run `--headless --script res://tests/test_runner.gd`. `verify.ps1` delegates to Python and returns its exit code.
-
-- [ ] **Step 6: Create the minimal scene**
-
-Create a `Node3D` root with one `Camera3D`, one `DirectionalLight3D`, and a `WorldEnvironment` using a generated sky color. No gameplay code yet.
-
-- [ ] **Step 7: Run verification**
-
-Expected: `PASS: 2 tests` and exit code `0`.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add .
-git commit -m "chore: bootstrap Godot project and verification harness"
-```
+**Commit:** `feat: add deterministic simulation clock`
 
 ---
 
-### Task 2: Define Pilot Commands, Parameters, Atmosphere, and Pure Flight Math
+### Task 3: Define pilot command and parameter contracts
 
-**Files:**
-- Create: `scripts/flight/pilot_command.gd`
-- Create: `scripts/flight/flight_parameters.gd`
-- Create: `scripts/flight/atmosphere_model.gd`
-- Create: `scripts/flight/flight_force_result.gd`
-- Create: `scripts/flight/flight_model.gd`
-- Create: `tests/unit/test_pilot_command.gd`
-- Create: `tests/unit/test_atmosphere_model.gd`
-- Create: `tests/unit/test_flight_model.gd`
-- Modify: `tests/test_runner.gd`
+**Create:** `scripts/flight/pilot_command.gd`, `scripts/flight/flight_parameters.gd`, `tests/unit/test_pilot_command.gd`.
 
-**Consumes:** `TestCase`, `TestAssert`.
+- [ ] Test axis clamping, normalized strafe input, zero-to-one collective/transition/brake, and non-mutating sanitization.
+- [ ] Implement `PilotCommand.sanitized()`.
+- [ ] Define validated defaults for a 4,200 kg craft, hover/forward/lateral thrust, control torques, reference area, drag, lift, speed, and stabilization.
+- [ ] Run verification.
 
-**Produces:** Deterministic force and torque calculation independent of the scene tree.
-
-- [ ] **Step 1: Write input-sanitization tests**
-
-```gdscript
-func test_command_is_clamped_without_mutating_source() -> void:
-    var source := PilotCommand.new()
-    source.pitch = 4.0
-    source.collective = -2.0
-    source.strafe = Vector3(3.0, 0.0, 4.0)
-    var clean := source.sanitized()
-    TestAssert.is_equal(clean.pitch, 1.0)
-    TestAssert.is_equal(clean.collective, 0.0)
-    TestAssert.is_near(clean.strafe.length(), 1.0, 0.000001)
-    TestAssert.is_equal(source.pitch, 4.0)
-```
-
-- [ ] **Step 2: Write atmosphere tests**
-
-```gdscript
-func test_air_density_falls_with_altitude() -> void:
-    var atmosphere := AtmosphereModel.new()
-    TestAssert.is_near(atmosphere.density_at_altitude(0.0), 1.225, 0.0001)
-    TestAssert.is_true(atmosphere.density_at_altitude(5000.0) < 1.225)
-    TestAssert.is_equal(atmosphere.density_at_altitude(-100.0), 1.225)
-```
-
-- [ ] **Step 3: Write flight-model tests**
-
-```gdscript
-func test_drag_opposes_velocity() -> void:
-    var result := FlightModel.new().calculate(
-        FlightParameters.new(),
-        PilotCommand.new(),
-        Basis.IDENTITY,
-        Vector3(0.0, 0.0, -100.0),
-        Vector3.ZERO,
-        1.225,
-        Vector3(0.0, -9.81, 0.0)
-    )
-    TestAssert.is_true(result.drag_force_world.z > 0.0)
-
-func test_transition_rotates_thrust_forward() -> void:
-    var command := PilotCommand.new()
-    command.collective = 1.0
-    command.transition = 1.0
-    var result := FlightModel.new().calculate(
-        FlightParameters.new(), command, Basis.IDENTITY,
-        Vector3.ZERO, Vector3.ZERO, 1.225, Vector3(0.0, -9.81, 0.0)
-    )
-    TestAssert.is_true(result.thrust_force_world.z < -70000.0)
-```
-
-- [ ] **Step 4: Run tests and confirm missing-class failures**
-
-- [ ] **Step 5: Implement the value objects**
-
-`PilotCommand.sanitized()` clamps axes to `[-1, 1]`, scalar controls to `[0, 1]`, and normalizes `strafe` only when its length exceeds one. `FlightForceResult` stores `total_force_world`, `total_torque_world`, `thrust_force_world`, `drag_force_world`, and `lift_force_world`.
-
-- [ ] **Step 6: Implement default tuning**
-
-```gdscript
-class_name FlightParameters
-extends Resource
-
-@export var mass_kg := 4200.0
-@export var hover_thrust_newtons := 56000.0
-@export var forward_thrust_newtons := 72000.0
-@export var lateral_thrust_newtons := 16000.0
-@export var pitch_torque_nm := 180000.0
-@export var yaw_torque_nm := 140000.0
-@export var roll_torque_nm := 200000.0
-@export var reference_area_m2 := 34.0
-@export var drag_coefficient := 0.34
-@export var lift_coefficient := 0.85
-@export var stability_strength := 3.0
-```
-
-- [ ] **Step 7: Implement atmosphere and flight formulas**
-
-```gdscript
-func density_at_altitude(altitude_m: float) -> float:
-    return 1.225 * exp(-maxf(altitude_m, 0.0) / 8500.0)
-```
-
-Flight model rules:
-
-```text
-forward = -basis.z
-up = basis.y
-hover thrust = up × hover_thrust × collective × (1 - transition)
-forward thrust = forward × forward_thrust × collective × transition
-lateral thrust = basis × strafe × lateral_thrust
-drag = -velocity.normalized × 0.5 × density × speed² × Cd × reference_area
-lift = up × 0.5 × density × forward_speed² × Cl × reference_area × transition
-gravity = gravity_world × mass
-stability torque = -angular_velocity × stability_strength × mass
-```
-
-- [ ] **Step 8: Add a 120-step repeatability test**
-
-Integrate velocity using `dt = 1.0 / 120.0` twice and assert both runs differ by no more than `0.000001 m/s`.
-
-- [ ] **Step 9: Run verification and commit**
-
-```bash
-git add scripts/flight tests
-git commit -m "feat: add deterministic VTOL flight model"
-```
+**Commit:** `feat: define pilot commands and flight parameters`
 
 ---
 
-### Task 3: Add the Physical Craft Controller and Blockout Scene
+### Task 4: Implement pure atmosphere and flight-force calculations
 
-**Files:**
-- Create: `scripts/flight/frontier_vtol_controller.gd`
-- Create: `scenes/craft/frontier_vtol.tscn`
-- Create: `tests/integration/test_frontier_vtol_controller.gd`
-- Modify: `scenes/flight_room/flight_room.tscn`
-- Modify: `tests/test_runner.gd`
+**Create:** `scripts/flight/atmosphere_model.gd`, `scripts/flight/flight_force_result.gd`, `scripts/flight/flight_model.gd`, `tests/unit/test_atmosphere_model.gd`, `tests/unit/test_flight_model.gd`.
 
-**Consumes:** `PilotCommand`, `FlightParameters`, `AtmosphereModel`, `FlightModel`.
+- [ ] Test sea-level density near `1.225 kg/m³`, monotonic density reduction with altitude, and negative-altitude clamping.
+- [ ] Test that full hover thrust exceeds weight.
+- [ ] Test that transition continuously rotates thrust from local up toward local forward.
+- [ ] Test that drag opposes world velocity.
+- [ ] Test that pure rotation commands produce torque without changing linear momentum directly.
+- [ ] Implement exponential atmosphere sampling.
+- [ ] Implement gravity, thrust, quadratic drag, transition-dependent lift, command torque, and angular stabilization.
+- [ ] Keep this layer free of scene-tree or input dependencies.
 
-**Produces:** A physical craft with telemetry, crash detection, landing detection, and deterministic reset.
-
-- [ ] **Step 1: Write controller tests**
-
-```gdscript
-func test_reset_clears_motion() -> void:
-    var craft := FrontierVtolController.new()
-    craft.linear_velocity = Vector3(10.0, 5.0, -2.0)
-    craft.angular_velocity = Vector3.ONE
-    var spawn := Transform3D(Basis.IDENTITY, Vector3(0.0, 3.0, 0.0))
-    craft.reset_to(spawn)
-    TestAssert.is_equal(craft.transform, spawn)
-    TestAssert.is_equal(craft.linear_velocity, Vector3.ZERO)
-    TestAssert.is_equal(craft.angular_velocity, Vector3.ZERO)
-
-func test_telemetry_contract() -> void:
-    var telemetry := FrontierVtolController.new().get_telemetry()
-    for key in ["speed_mps", "altitude_m", "vertical_speed_mps", "collective", "transition", "is_grounded", "lift_newtons", "drag_newtons", "thrust_newtons"]:
-        TestAssert.is_true(telemetry.has(key), "Missing telemetry key: " + key)
-```
-
-- [ ] **Step 2: Run tests and confirm failure**
-
-- [ ] **Step 3: Implement the controller**
-
-Use `RigidBody3D`, `gravity_scale = 0`, `continuous_cd = true`, `contact_monitor = true`, and `max_contacts_reported = 8`. In `_integrate_forces`, calculate altitude from global Y, obtain density, call `FlightModel.calculate`, and apply central force plus torque.
-
-- [ ] **Step 4: Implement impact-state rules**
-
-Emit `crashed` when a newly detected ground contact has relative speed `>= 32 m/s`. Emit `landed` after remaining grounded for `0.35 s` while total speed is `<= 6 m/s` and absolute vertical speed is `<= 3.5 m/s`.
-
-- [ ] **Step 5: Build the craft scene**
-
-Create an 11 m-wide primitive craft with one box-based convex collision approximation and named nodes:
-
-```text
-FrontierVtolController
-├── VisualRoot
-├── CollisionShape3D
-├── CockpitAnchor
-├── ChaseAnchor
-└── ForwardMarker
-```
-
-Godot convention is `-Z` forward and `+Y` up.
-
-- [ ] **Step 6: Add test terrain**
-
-Add a static 400×2×500 m ground body and spawn the craft at `(0, 2.2, 0)`.
-
-- [ ] **Step 7: Run verification, launch the scene, and commit**
-
-```bash
-git add scripts/flight scenes tests
-git commit -m "feat: add physical VTOL controller and blockout craft"
-```
+**Commit:** `feat: add deterministic atmosphere and flight force model`
 
 ---
 
-### Task 4: Implement Keyboard/Mouse Input and Both Camera Modes
+### Task 5: Build the physical craft controller and scene
 
-**Files:**
-- Create: `scripts/input/pilot_input_adapter.gd`
-- Create: `scripts/camera/flight_camera_rig.gd`
-- Create: `scenes/craft/flight_camera_rig.tscn`
-- Create: `tests/unit/test_pilot_input_adapter.gd`
-- Create: `tests/unit/test_flight_camera_rig.gd`
-- Modify: `scenes/flight_room/flight_room.tscn`
-- Modify: `tests/test_runner.gd`
+**Create:** `scripts/flight/frontier_vtol_controller.gd`, `scenes/craft/frontier_vtol.tscn`, `tests/integration/test_frontier_vtol_controller.gd`.
 
-**Produces:** Playable keyboard/mouse flight, cockpit view, chase view, and camera toggle.
+- [ ] Test required telemetry keys: speed, altitude, transition, collective, vertical speed, grounded state, lift, drag, and thrust.
+- [ ] Test that reset restores an exact transform and clears linear/angular velocity.
+- [ ] Set `custom_integrator = true`, mass from `FlightParameters`, contact monitoring, continuous collision detection, and bounded contact count.
+- [ ] In `_integrate_forces`, sample density and apply the exact force/torque returned by `FlightModel`.
+- [ ] Distinguish a soft landing from a crash using configurable impact thresholds.
+- [ ] Build a primitive collision hull and visual blockout with `CockpitAnchor`, `ChaseAnchor`, and `ForwardMarker` using `-Z` as forward and `+Y` as up.
+- [ ] Instance the craft into the flight room above a static ground plane.
 
-- [ ] **Step 1: Write input tests**
-
-```gdscript
-func test_mouse_stick_clamps() -> void:
-    var adapter := PilotInputAdapter.new()
-    adapter.inject_mouse_delta(Vector2(100000.0, -100000.0))
-    var command := adapter.build_command(1.0 / 120.0)
-    TestAssert.is_equal(absf(command.pitch), 1.0)
-    TestAssert.is_equal(absf(command.yaw), 1.0)
-
-func test_transition_clamps() -> void:
-    var adapter := PilotInputAdapter.new()
-    adapter.set_transition_for_test(2.0)
-    TestAssert.is_equal(adapter.build_command(0.0).transition, 1.0)
-```
-
-- [ ] **Step 2: Write camera tests**
-
-```gdscript
-func test_camera_toggle_cycles() -> void:
-    var rig := FlightCameraRig.new()
-    TestAssert.is_equal(rig.mode, FlightCameraRig.MODE_CHASE)
-    rig.toggle_mode()
-    TestAssert.is_equal(rig.mode, FlightCameraRig.MODE_COCKPIT)
-    rig.toggle_mode()
-    TestAssert.is_equal(rig.mode, FlightCameraRig.MODE_CHASE)
-```
-
-- [ ] **Step 3: Implement input actions and virtual mouse stick**
-
-Register actions at runtime when missing. Use sensitivity `0.0035` and recenter rate `1.35 units/s`.
-
-Default bindings:
-
-```text
-Mouse X/Y: yaw/pitch
-Q/E: roll
-Space/Ctrl: collective up/down
-A/D: lateral strafe
-W/S: longitudinal translation assist
-Z/X: transition decrease/increase
-Shift: brake
-C: toggle camera
-F5: restart
-Esc: release/capture mouse
-```
-
-- [ ] **Step 4: Implement the camera rig**
-
-Cockpit mode copies `CockpitAnchor.global_transform`. Chase mode targets `ChaseAnchor`, uses 13 m distance, 4.2 m height, exponential position smoothing `7.0`, rotation smoothing `9.0`, craft-relative up, and FOV `78`.
-
-- [ ] **Step 5: Wire input to craft and camera**
-
-A small room controller may temporarily forward the command each physics frame; Task 5 replaces it with the final mission controller.
-
-- [ ] **Step 6: Verify takeoff and landing in both views**
-
-The craft must remain controllable with default settings and the cockpit view must not clip into primitive geometry.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add scripts/input scripts/camera scenes/craft scenes/flight_room tests
-git commit -m "feat: add keyboard mouse flight controls and cameras"
-```
+**Commit:** `feat: add physical VTOL controller and blockout craft`
 
 ---
 
-### Task 5: Build the Ordered Route, Landing Rules, Crash State, and Restart Loop
+### Task 6: Add keyboard-and-mouse input
 
-**Files:**
-- Create: `scripts/game/route_gate.gd`
-- Create: `scripts/game/landing_zone.gd`
-- Create: `scripts/game/flight_room_controller.gd`
-- Create: `tests/integration/test_flight_room_loop.gd`
-- Modify: `scenes/flight_room/flight_room.tscn`
-- Modify: `tests/test_runner.gd`
+**Create:** `scripts/input/pilot_input_adapter.gd`, `tests/unit/test_pilot_input_adapter.gd`.
 
-**Consumes:** `FrontierVtolController`, `PilotInputAdapter`, `FlightCameraRig`.
+- [ ] Test injected mouse delta conversion to bounded pitch/yaw.
+- [ ] Test transition accumulation and clamping.
+- [ ] Create input actions at runtime with `InputMap` if missing; never rely on brittle handwritten serialized `Object(InputEventKey, ...)` entries.
+- [ ] Bind mouse to pitch/yaw; Q/E to roll; Space/Ctrl to collective; Z/X to transition; F/H and R/V to translation; Shift to brake; C to camera; F5 to restart; Escape to release the mouse.
+- [ ] Emit camera-toggle and restart signals.
+- [ ] Instance the adapter into the flight room.
 
-**Produces:** A complete takeoff → gates → landing → completion/restart game loop.
-
-- [ ] **Step 1: Write route-state tests**
-
-```gdscript
-func test_out_of_order_gate_is_ignored() -> void:
-    var room := FlightRoomController.new()
-    room.register_gate(1)
-    TestAssert.is_equal(room.next_gate_index, 0)
-
-func test_landing_requires_all_gates() -> void:
-    var room := FlightRoomController.new()
-    room.register_landing()
-    TestAssert.is_equal(room.state, FlightRoomController.STATE_FLYING)
-
-func test_valid_route_completes() -> void:
-    var room := FlightRoomController.new()
-    room.register_gate(0)
-    room.register_gate(1)
-    room.register_gate(2)
-    room.register_landing()
-    TestAssert.is_equal(room.state, FlightRoomController.STATE_COMPLETE)
-```
-
-- [ ] **Step 2: Run tests and confirm failure**
-
-- [ ] **Step 3: Implement ordered gates**
-
-Place gates at:
-
-```text
-Gate 0: (0, 18, -80)
-Gate 1: (55, 30, -175)
-Gate 2: (-35, 16, -270)
-```
-
-Only the expected gate accepts the craft. Completed gates dim; the next gate remains emissive.
-
-- [ ] **Step 4: Implement landing-zone acceptance**
-
-Landing pad center is `(0, 0.2, -340)` with a 30×5×30 m trigger. Completion requires all gates, grounded state, total speed `<= 8 m/s`, and absolute vertical speed `<= 3.5 m/s`.
-
-- [ ] **Step 5: Implement room states and restart**
-
-Capture spawn transform on `_ready`. `restart_run()` resets craft transform and velocities, gate progress, gate visuals, landing-zone state, timers, and room state. Crash state disables pilot commands except restart.
-
-- [ ] **Step 6: Wire signals**
-
-Connect input camera/restart signals, craft crash/land signals, gate entry signals, and landing-zone entry signal.
-
-- [ ] **Step 7: Verify negative cases**
-
-Landing outside the pad, skipping a gate, or hitting the ground above the crash threshold must not complete the run.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add scripts/game scenes/flight_room tests
-git commit -m "feat: add flight room route landing and restart loop"
-```
+**Commit:** `feat: add keyboard and mouse flight input`
 
 ---
 
-### Task 6: Add HUD, Environment, Engine Feedback, and Original Blender Blockout
+### Task 7: Add cockpit and chase camera systems
 
-**Files:**
-- Create: `scripts/ui/flight_hud.gd`
-- Create: `scenes/ui/flight_hud.tscn`
-- Create: `scripts/environment/flight_room_environment.gd`
-- Create: `scenes/flight_room/flight_room_environment.tscn`
-- Create: `scripts/flight/flight_feedback.gd`
-- Create: `tools/blender/generate_vtol_blockout.py`
-- Create: `assets/generated/vtol_blockout.asset.json`
-- Create: `scripts/validation/asset_manifest_validator.gd`
-- Create: `tests/unit/test_flight_hud.gd`
-- Create: `tests/unit/test_flight_feedback.gd`
-- Create: `tests/unit/test_asset_manifest_validator.gd`
-- Modify: `scenes/craft/frontier_vtol.tscn`
-- Modify: `scenes/flight_room/flight_room.tscn`
-- Modify: `tests/test_runner.gd`
+**Create:** `scripts/camera/flight_camera_rig.gd`, `scenes/craft/flight_camera_rig.tscn`, `tests/unit/test_flight_camera_rig.gd`.
 
-**Produces:** Readable telemetry, visual speed reference, generated audio, exhaust response, and an original reproducible craft model.
+- [ ] Define stable modes `MODE_COCKPIT = 0` and `MODE_CHASE = 1`.
+- [ ] Test toggle order and invalid-mode rejection.
+- [ ] Bind to the craft anchors.
+- [ ] Make cockpit mode follow the cockpit anchor exactly.
+- [ ] Make chase mode smooth position and orientation while preserving craft-local up.
+- [ ] Give the chase camera a 78° field of view and collision-safe near plane.
+- [ ] Remove the bootstrap debug camera.
 
-- [ ] **Step 1: Write HUD formatting tests**
-
-```gdscript
-func test_speed_format() -> void:
-    TestAssert.is_equal(FlightHud.format_speed(10.0), "036 km/h")
-
-func test_vertical_speed_format() -> void:
-    TestAssert.is_equal(FlightHud.format_vertical_speed(2.5), "+2.5 m/s")
-
-func test_transition_format() -> void:
-    TestAssert.is_equal(FlightHud.format_transition(0.425), "42%")
-```
-
-- [ ] **Step 2: Write feedback tests**
-
-```gdscript
-func test_engine_intensity() -> void:
-    TestAssert.is_near(FlightFeedback.engine_intensity(0.7, 0.5), 0.8, 0.000001)
-
-func test_wind_intensity() -> void:
-    TestAssert.is_near(FlightFeedback.wind_intensity(90.0), 0.5, 0.000001)
-```
-
-- [ ] **Step 3: Create the HUD**
-
-Show speed, altitude, vertical speed, collective, transition, gate progress, current camera, and a centered state banner. `CRASHED — F5 TO RESTART` and `ROUTE COMPLETE — F5 TO FLY AGAIN` are the only blocking messages.
-
-- [ ] **Step 4: Create the environment**
-
-Build a 500×900 m ground strip, route pylons, six large silhouette landmarks, runway edge lights, a blue-gray sky, one directional light, and fog density `0.0018`. All geometry is primitive or procedurally generated in-engine.
-
-- [ ] **Step 5: Create generated sound and exhaust response**
-
-Use `AudioStreamGenerator` for a layered 55–145 Hz engine tone. Use deterministic linear-congruential noise for wind. Exhaust mesh length scales from `0.15` to `2.6` based on `clamp(collective + transition * 0.2, 0, 1)`.
-
-- [ ] **Step 6: Create and validate the asset manifest**
-
-```json
-{
-  "asset_id": "frontier_vtol_blockout_v1",
-  "license": "Project original",
-  "units": "meters",
-  "forward_axis": "-Z",
-  "up_axis": "+Y",
-  "dimensions_m": [11.0, 2.6, 8.0],
-  "required_nodes": [
-    "VTOL_Root", "Body", "Wing", "CockpitShell",
-    "Engine_Left", "Engine_Right", "CockpitAnchor",
-    "ChaseAnchor", "ForwardMarker"
-  ],
-  "generator": "tools/blender/generate_vtol_blockout.py"
-}
-```
-
-- [ ] **Step 7: Implement the Blender generator**
-
-Use only deterministic beveled boxes and cylinders, one graphite metallic material, identity root transform, named empties, and explicit metric dimensions. Save `assets/source/vtol_blockout.blend`; export `assets/generated/vtol_blockout.glb`.
-
-Run:
-
-```powershell
-blender --background --python ./tools/blender/generate_vtol_blockout.py
-```
-
-- [ ] **Step 8: Replace primitive visuals without replacing gameplay anchors**
-
-Godot `Marker3D` nodes remain authoritative. Imported asset nodes are visual only; collisions remain owned by `frontier_vtol.tscn`.
-
-- [ ] **Step 9: Inspect six views and both cameras**
-
-Reject wrong scale, orientation, cockpit position, silhouette, clipping, or unreadable exhaust placement.
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add assets scenes scripts tools tests
-git commit -m "feat: add presentation layer and generated VTOL blockout"
-```
+**Commit:** `feat: add cockpit and chase camera modes`
 
 ---
 
-### Task 7: Add Contract Validation, Windows Export, and CI
+### Task 8: Add the complete route, landing, crash, and restart loop
 
-**Files:**
-- Create: `scripts/validation/project_contract_validator.gd`
-- Create: `tests/unit/test_project_contract_validator.gd`
-- Create: `export_presets.cfg`
-- Create: `.github/workflows/verify.yml`
-- Modify: `tools/verify/verify.py`
-- Modify: `README.md`
-- Modify: `tests/test_runner.gd`
+**Create:** `scripts/game/route_gate.gd`, `scripts/game/flight_room_controller.gd`, `tools/godot/build_flight_room_route.gd`, `tests/integration/test_flight_room_loop.gd`.
 
-**Produces:** Reproducible validation and Windows export baseline.
+- [ ] Test that route gates only advance in order.
+- [ ] Test that landing completes only after all gates.
+- [ ] Test that restart clears route state and returns to `STATE_FLYING`.
+- [ ] Connect input, craft, camera, gate, crash, and landing signals in `FlightRoomController`.
+- [ ] Capture the spawn transform once and restore it on restart.
+- [ ] Author three deterministic gates at `(0,18,-80)`, `(55,30,-175)`, and `(-35,16,-270)`.
+- [ ] Author a landing pad centered at `(0,0.25,-340)`.
+- [ ] Build the scene nodes through an editor script so ownership, groups, dimensions, and positions are reproducible.
+- [ ] Manually verify takeoff, ordered gates, soft landing, crash, and F5 restart.
 
-- [ ] **Step 1: Write repository-contract tests**
+**Commit:** `feat: add takeoff route landing and restart loop`
 
-```gdscript
-func test_required_phase_one_paths_exist() -> void:
-    for path in ProjectContractValidator.required_paths():
-        TestAssert.is_true(FileAccess.file_exists(path), "Missing: " + path)
+---
 
-func test_main_scene_and_tick_rate_are_locked() -> void:
-    TestAssert.is_equal(
-        ProjectSettings.get_setting("application/run/main_scene"),
-        "res://scenes/flight_room/flight_room.tscn"
-    )
-    TestAssert.is_equal(
-        ProjectSettings.get_setting("physics/common/physics_ticks_per_second"),
-        120
-    )
-```
+### Task 9: Add a readable flight HUD
 
-- [ ] **Step 2: Add Windows export preset**
+**Create:** `scripts/ui/flight_hud.gd`, `scenes/ui/flight_hud.tscn`, `tests/unit/test_flight_hud.gd`.
 
-Target `build/windows/STRATOSPHERE.exe`, embed the PCK, use 64-bit architecture, and do not require signing for development builds.
+- [ ] Test speed formatting in km/h, signed vertical speed, and integer percentages.
+- [ ] Display speed, altitude, vertical speed, collective, vector transition, route progress, crash state, and completion state.
+- [ ] Wire craft telemetry and flight-room signals to HUD handlers.
+- [ ] Verify readability at 1280×720 and 1600×900 in both camera modes.
 
-- [ ] **Step 3: Add CI**
+**Commit:** `feat: add flight telemetry HUD`
 
-The workflow must check out the repo, install Godot 4.7.1, and run:
+---
 
-```bash
-python tools/verify/verify.py
-```
+### Task 10: Generate the first Blender VTOL blockout
 
-It must not upload builds or consume Actions minutes on Blender generation.
+**Create:** `tools/blender/generate_vtol_blockout.py`, `assets/generated/vtol_blockout.asset.json`, `scripts/validation/asset_manifest_validator.gd`, `tests/unit/test_asset_manifest_validator.gd`.
 
-- [ ] **Step 4: Extend verification**
+**Generate:** `assets/source/vtol_blockout.blend`, `assets/generated/vtol_blockout.glb`.
 
-After Godot tests, verify all contract paths, check that no generated file exceeds 100 MB, and print an actionable failure list.
+- [ ] Define an asset manifest with meter units, `-Z` forward, `+Y` up, dimensions, license, generator path, and required node names.
+- [ ] Test manifest structure and required anchors.
+- [ ] Script a body, wing, cockpit shell, left/right engine pods, and anchor empties in Blender.
+- [ ] Save the source `.blend` and export `.glb` deterministically.
+- [ ] Replace primitive visual meshes while retaining the tested collision hull.
+- [ ] Inspect front, rear, left, right, top, and cockpit views before accepting the asset.
 
-- [ ] **Step 5: Document local commands and controls**
+**Commit:** `feat: generate and validate VTOL blockout asset`
 
-README must contain setup, play, verification, Blender generation, matching Godot export-template requirement, Windows export, controls, project boundaries, and current milestone status.
+---
 
-- [ ] **Step 6: Run final automated gate**
+### Task 11: Add environment and flight feedback
 
-```powershell
-pwsh ./tools/verify/verify.ps1
-```
+**Create:** `scenes/flight_room/flight_room_environment.tscn`, `scripts/flight/flight_feedback.gd`, `tests/unit/test_flight_feedback.gd`.
 
-Expected: all tests pass, project imports cleanly, and no contract path is missing.
+- [ ] Test deterministic engine and wind intensity mappings.
+- [ ] Add a 400×800 meter test strip, runway lights, route pylons, fog, sun, and six large parallax landmarks.
+- [ ] Generate engine hum and wind through `AudioStreamGenerator`; do not add downloaded copyrighted audio.
+- [ ] Add two exhaust visuals scaled by engine intensity.
+- [ ] Verify speed is readable without the HUD, gates remain visible, and neither camera intersects normal geometry.
 
-- [ ] **Step 7: Run final manual gate**
+**Commit:** `feat: add flight environment audio and visual feedback`
 
-From a clean launch: take off, pass all three gates, switch camera twice, land, observe completion, restart, crash deliberately, and restart again. No input lock, stale gate state, camera desynchronization, or physics explosion is acceptable.
+---
 
-- [ ] **Step 8: Export Windows build**
+### Task 12: Add contract validation, CI, and Windows export
 
-```powershell
-godot --headless --path . --export-release "Windows Desktop" build/windows/STRATOSPHERE.exe
-```
+**Create:** `scripts/validation/project_contract_validator.gd`, `tests/unit/test_project_contract_validator.gd`, `.github/workflows/verify.yml`, `export_presets.cfg`.
 
-- [ ] **Step 9: Commit**
+**Modify:** `tools/verify/verify.py`, `README.md`.
 
-```bash
-git add .github export_presets.cfg scripts/validation tests tools README.md
-git commit -m "chore: lock Phase 1 verification and Windows export"
-```
+- [ ] Validate every required Phase 0–1 path, main scene, and 120 Hz setting.
+- [ ] Extend Python verification with repository path checks.
+- [ ] Add a Windows Desktop export preset producing `build/windows/STRATOSPHERE.exe`.
+- [ ] Add a GitHub Actions job that downloads Godot 4.6.3 stable and runs import plus tests without uploading build artifacts.
+- [ ] Document verification, play, Blender generation, controls, and Windows export.
+- [ ] Run local verification from a clean checkout.
+- [ ] Export and launch the Windows executable.
 
-## Definition of Done
+**Commit:** `chore: add Phase 1 verification and Windows export baseline`
 
-Phase 0–1 is complete only when all of the following are true:
+---
 
-- A clean checkout imports in Godot 4.7.1.
-- `pwsh ./tools/verify/verify.ps1` exits `0`.
-- The craft takes off, hovers, transitions, flies the route, and lands.
-- Both cockpit and chase views are usable throughout the route.
-- Crash, completion, and restart states are reliable.
-- HUD and feedback communicate speed, altitude, vertical speed, thrust, transition, route state, and failure state.
-- The VTOL visual is reproducibly generated through Blender and validated by manifest.
-- The repository has a working Windows export preset and CI verification.
-- No system outside the approved milestone has been added.
+## Phase 0–1 acceptance gate
+
+The milestone is complete only when all statements are true:
+
+1. A new player can take off and understand the basic HUD without external documentation.
+2. Hover preserves inertia and never snaps velocity to camera direction.
+3. Rotating without translational thrust does not erase linear velocity.
+4. Transition continuously reallocates thrust rather than teleporting between modes.
+5. Mouse pitch/yaw, Q/E roll, collective, camera toggle, and restart are reliable.
+6. Both cameras can complete the route.
+7. Crashes and soft landings are distinguishable.
+8. Restart restores transform, velocities, gates, and state.
+9. Headless tests pass from a clean checkout.
+10. The Windows export launches without editor-only dependencies.
+
+## Deliberately deferred
+
+Open-world streaming, economy, progression, combat, dynamic weather, final vehicle art, orbital flight, moons, campaign content, and advanced damage belong to later independent specifications and plans.
