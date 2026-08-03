@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "asset_id": "vtol_blockout",
+  "display_name": "Frontier Vector VTOL Blockout",
+  "unit_scale_meters": 1.0,
+  "forward_axis": "-Z",
+  "up_axis": "+Y",
+  "dimensions_m": {
+    "width": 9.2,
+    "height": 2.4,
+    "length": 7.2
+  },
+  "license": {
+    "type": "Project original",
+    "author": "STRATOSPHERE procedural asset pipeline",
+    "commercial_use": true
+  },
+  "generator": "tools/blender/generate_vtol_blockout.py",
+  "source_blend": "assets/source/vtol_blockout.blend",
+  "runtime_glb": "assets/generated/vtol_blockout.glb",
+  "required_nodes": [
+    "VTOL_Blockout",
+    "Body",
+    "CockpitShell",
+    "LeftEnginePod",
+    "RightEnginePod",
+    "CockpitAnchor",
+    "ChaseAnchor",
+    "ForwardMarker"
+  ]
+}
