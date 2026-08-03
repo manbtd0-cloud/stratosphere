@@ -15,40 +15,34 @@ func calculate(
 ) -> FlightForceResult:
 	var clean := command.sanitized()
 	var orientation := basis.orthonormalized()
-	var right := orientation.x.normalized()
 	var up := orientation.y.normalized()
 	var forward := -orientation.z.normalized()
 
-	var hover_weight := 1.0 - clean.transition
-	var hover_thrust := (
-		up
-		* parameters.hover_thrust_newtons
-		* clean.collective
-		* hover_weight
+	var thrust_direction := up.slerp(forward, clean.transition).normalized()
+	var available_thrust := lerpf(
+		parameters.hover_thrust_newtons,
+		parameters.forward_thrust_newtons,
+		clean.transition
 	)
-	var forward_thrust := (
-		forward
-		* parameters.forward_thrust_newtons
-		* clean.collective
-		* clean.transition
-	)
+	var primary_thrust := thrust_direction * available_thrust * clean.collective
 	var local_translation := Vector3(clean.strafe.x, clean.strafe.y, -clean.strafe.z)
 	var lateral_thrust := (
 		orientation
 		* local_translation
 		* parameters.lateral_thrust_newtons
 	)
-	var thrust_force := hover_thrust + forward_thrust + lateral_thrust
+	var thrust_force := primary_thrust + lateral_thrust
 
 	var speed := linear_velocity_world.length()
 	var drag_force := Vector3.ZERO
+	var drag_magnitude := 0.0
 	if speed > MIN_SPEED_MPS:
 		var forward_speed := maxf(linear_velocity_world.dot(forward), 0.0)
-		var maximum_speed := maxf(parameters.maximum_forward_speed_mps, 1.0)
+		var maximum_speed := maxf(parameters.max_forward_speed_mps, 1.0)
 		var overspeed_ratio := maxf(forward_speed - maximum_speed, 0.0) / maximum_speed
 		var overspeed_multiplier := 1.0 + overspeed_ratio * overspeed_ratio * 6.0
 		var brake_multiplier := 1.0 + clean.brake * 2.0
-		var drag_magnitude := (
+		drag_magnitude = (
 			0.5
 			* maxf(air_density_kg_m3, 0.0)
 			* speed
@@ -74,9 +68,9 @@ func calculate(
 	var gravity_force := gravity_world * parameters.mass_kg
 
 	var command_torque_local := Vector3(
-		clean.pitch * parameters.pitch_torque_nm,
-		clean.yaw * parameters.yaw_torque_nm,
-		-clean.roll * parameters.roll_torque_nm
+		clean.pitch * parameters.pitch_torque_newton_meters,
+		clean.yaw * parameters.yaw_torque_newton_meters,
+		-clean.roll * parameters.roll_torque_newton_meters
 	)
 	var command_torque_world := orientation * command_torque_local
 	var stability_torque := (
@@ -90,6 +84,9 @@ func calculate(
 	result.drag_force_world = drag_force
 	result.lift_force_world = lift_force
 	result.gravity_force_world = gravity_force
-	result.total_force_world = thrust_force + drag_force + lift_force + gravity_force
-	result.total_torque_world = command_torque_world + stability_torque
+	result.force_world = thrust_force + drag_force + lift_force + gravity_force
+	result.torque_world = command_torque_world + stability_torque
+	result.thrust_newtons = thrust_force.length()
+	result.drag_newtons = drag_magnitude
+	result.lift_newtons = lift_magnitude
 	return result
