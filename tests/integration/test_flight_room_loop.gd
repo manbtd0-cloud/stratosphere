@@ -50,3 +50,20 @@ func test_crash_and_restart_clear_route_state() -> void:
 	TestAssert.is_true(not room.is_landing_zone_occupied())
 
 	room.free()
+
+
+func test_pilot_control_is_enabled_only_while_flying() -> void:
+	var room := FlightRoomController.new()
+	room.configure_gate_count(1)
+
+	TestAssert.is_true(room.is_pilot_control_enabled())
+	room.handle_crash()
+	TestAssert.is_true(not room.is_pilot_control_enabled())
+	room.restart_run()
+	TestAssert.is_true(room.is_pilot_control_enabled())
+	room.try_pass_gate(0)
+	room.set_landing_zone_occupied(true)
+	room.handle_landing()
+	TestAssert.is_true(not room.is_pilot_control_enabled())
+
+	room.free()
