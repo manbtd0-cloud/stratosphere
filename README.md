@@ -9,7 +9,7 @@ Phase 0–1 proves the central promise before the project expands: the craft mus
 - Godot 4.6.3 stable
 - Python 3.12 or newer
 - PowerShell 7 on Windows
-- Blender 5.2-compatible Python API for generated vehicle assets
+- Blender 3.4 or newer for generated vehicle assets
 
 ## Verify
 
@@ -25,7 +25,7 @@ Cross-platform:
 python tools/verify/verify.py
 ```
 
-The verifier checks the repository contract, generated-asset manifest, Blender Python syntax, Godot import output, and the complete headless test suite. Set `GODOT_BIN` when Godot is not available as `godot`, `godot4`, or `C:\Tools\Godot\godot.exe`.
+The verifier checks the repository contract, generated-asset manifest, Blender Python syntax, Godot import output, all headless tests, and a real gameplay-scene smoke run. Set `GODOT_BIN` when Godot is not available as `godot`, `godot4`, or `C:\Tools\Godot\godot.exe`.
 
 ## Play
 
@@ -53,16 +53,16 @@ The main scene is `scenes/flight_room/flight_room.tscn`.
 
 ## Generate the VTOL asset
 
-The repository retains a primitive visual fallback, so the game remains importable without Blender. Generate the original hard-surface source and runtime model with:
+The editable `.blend` source and Godot-ready `.glb` are generated from source-controlled geometry. Use the canonical builder, which applies and verifies the Blender-to-Godot axis conversion exactly once:
 
 ```powershell
-blender --background --python tools/blender/generate_vtol_blockout.py
+blender --background --python tools/blender/build_vtol_blockout.py
 ```
 
 Generate six inspection renders as well:
 
 ```powershell
-blender --background --python tools/blender/generate_vtol_blockout.py -- --render-previews
+blender --background --python tools/blender/build_vtol_blockout.py -- --render-previews
 ```
 
 Outputs:
@@ -71,7 +71,7 @@ Outputs:
 - `assets/generated/vtol_blockout.glb`
 - optional previews in `assets/generated/previews/vtol_blockout/`
 
-The contract for scale, axes, license, generation paths, and required gameplay anchors is stored in `assets/generated/vtol_blockout.asset.json`.
+Godot uses the generated GLB as the in-game craft visual while collision, cameras, physics, and feedback remain independently controlled by the craft scene. The contract for scale, axes, licensing, generation paths, and required anchors is stored in `assets/generated/vtol_blockout.asset.json`.
 
 ## Export Windows
 
@@ -86,7 +86,7 @@ Output:
 - `build/windows/STRATOSPHERE.exe`
 - `build/windows/STRATOSPHERE.pck`
 
-The narrowly triggered `Windows Prototype Build` workflow verifies the project, performs the cross-platform Windows export, and retains a downloadable artifact for 14 days.
+The `Phase 0-1 Verify` workflow imports the project, runs the complete verification gate, performs the cross-platform Windows export, and retains a downloadable artifact for 14 days.
 
 ## Implemented in Phase 0–1
 
@@ -100,8 +100,8 @@ The narrowly triggered `Windows Prototype Build` workflow verifies the project, 
 - Telemetry HUD and control hints
 - Procedural engine hum, wind noise, and exhaust feedback
 - 400×800 meter frontier test environment with runway lighting and large landmarks
-- Source-controlled Blender VTOL generator and asset manifest
-- Clean-checkout verification and Windows export preset
+- Generated Blender VTOL source and Godot runtime model
+- Clean-checkout tests, gameplay smoke verification, and Windows export
 
 ## Deliberately deferred
 
