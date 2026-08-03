@@ -2,6 +2,7 @@ class_name TestAssetManifestValidator
 extends TestCase
 
 const MANIFEST_PATH := "res://assets/generated/vtol_blockout.asset.json"
+const RUNTIME_GLB_PATH := "res://assets/generated/vtol_blockout.glb"
 
 
 func test_manifest_is_valid_and_complete() -> void:
@@ -53,3 +54,25 @@ func test_manifest_generation_paths_are_repository_relative() -> void:
 		manifest.get("runtime_glb"),
 		"assets/generated/vtol_blockout.glb"
 	)
+
+
+func test_exported_model_uses_godot_forward_axis() -> void:
+	var packed: PackedScene = load(RUNTIME_GLB_PATH)
+	var model := packed.instantiate()
+	var forward_marker := model.get_node_or_null("ForwardMarker") as Node3D
+	var cockpit_anchor := model.get_node_or_null("CockpitAnchor") as Node3D
+
+	TestAssert.is_true(forward_marker != null, "GLB must contain ForwardMarker")
+	TestAssert.is_true(cockpit_anchor != null, "GLB must contain CockpitAnchor")
+	if forward_marker != null:
+		TestAssert.is_true(
+			forward_marker.position.z < 0.0,
+			"ForwardMarker must point along Godot -Z"
+		)
+	if cockpit_anchor != null:
+		TestAssert.is_true(
+			cockpit_anchor.position.z < 0.0,
+			"CockpitAnchor must remain toward the craft nose"
+		)
+
+	model.free()
