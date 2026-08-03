@@ -1,0 +1,40 @@
+extends SceneTree
+
+const TEST_SUITES := [
+	preload("res://tests/unit/test_project_bootstrap.gd"),
+	preload("res://tests/unit/test_simulation_clock.gd"),
+	preload("res://tests/unit/test_pilot_command.gd"),
+	preload("res://tests/unit/test_atmosphere_model.gd"),
+	preload("res://tests/unit/test_flight_model.gd"),
+	preload("res://tests/integration/test_frontier_vtol_controller.gd"),
+	preload("res://tests/unit/test_pilot_input_adapter.gd"),
+	preload("res://tests/unit/test_flight_camera_rig.gd"),
+	preload("res://tests/integration/test_flight_room_loop.gd"),
+	preload("res://tests/unit/test_flight_hud.gd"),
+	preload("res://tests/unit/test_asset_manifest_validator.gd"),
+	preload("res://tests/unit/test_flight_feedback.gd"),
+	preload("res://tests/unit/test_project_contract_validator.gd"),
+]
+
+
+func _initialize() -> void:
+	call_deferred("_run_all")
+
+
+func _run_all() -> void:
+	TestAssert.reset()
+	var total := 0
+	for suite_script in TEST_SUITES:
+		var suite: TestCase = suite_script.new()
+		total += suite.run()
+
+	var failures := TestAssert.failure_count()
+	if failures > 0:
+		print("FAIL: %d failures across %d tests" % [failures, total])
+		for failure_message in TestAssert.failures():
+			print("  - " + failure_message)
+		quit(1)
+		return
+
+	print("PASS: %d tests" % total)
+	quit(0)

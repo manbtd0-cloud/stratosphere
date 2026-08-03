@@ -1,0 +1,75 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/flight/frontier_vtol_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://scripts/flight/flight_feedback.gd" id="2_feedback"]
+[ext_resource type="PackedScene" path="res://assets/generated/vtol_blockout.glb" id="3_generated_vtol"]
+[ext_resource type="Script" path="res://scripts/flight/procedural_audio_player_3d.gd" id="4_audio_player"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_hull"]
+size = Vector3(4.4, 1.6, 7.2)
+
+[sub_resource type="StandardMaterial3D" id="Material_exhaust"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0.15, 0.72, 1, 0.64)
+emission_enabled = true
+emission = Color(0.04, 0.48, 1, 1)
+emission_energy_multiplier = 5.0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_exhaust"]
+material = SubResource("Material_exhaust")
+top_radius = 0.08
+bottom_radius = 0.34
+height = 1.0
+radial_segments = 12
+rings = 2
+
+[node name="FrontierVTOL" type="RigidBody3D"]
+mass = 4200.0
+can_sleep = false
+continuous_cd = true
+contact_monitor = true
+max_contacts_reported = 8
+custom_integrator = true
+script = ExtResource("1_controller")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape_hull")
+
+[node name="VisualRoot" type="Node3D" parent="."]
+
+[node name="GeneratedVTOL" parent="VisualRoot" instance=ExtResource("3_generated_vtol")]
+
+[node name="FlightFeedback" type="Node3D" parent="."]
+script = ExtResource("2_feedback")
+
+[node name="LeftExhaust" type="MeshInstance3D" parent="FlightFeedback"]
+position = Vector3(-3.55, -0.15, 2.45)
+rotation_degrees = Vector3(90, 0, 0)
+mesh = SubResource("CylinderMesh_exhaust")
+
+[node name="RightExhaust" type="MeshInstance3D" parent="FlightFeedback"]
+position = Vector3(3.55, -0.15, 2.45)
+rotation_degrees = Vector3(90, 0, 0)
+mesh = SubResource("CylinderMesh_exhaust")
+
+[node name="EngineAudio" type="AudioStreamPlayer3D" parent="FlightFeedback"]
+volume_db = -32.0
+unit_size = 8.0
+max_distance = 1200.0
+script = ExtResource("4_audio_player")
+
+[node name="WindAudio" type="AudioStreamPlayer3D" parent="FlightFeedback"]
+volume_db = -48.0
+unit_size = 18.0
+max_distance = 1200.0
+script = ExtResource("4_audio_player")
+
+[node name="CockpitAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 1.15, -1.9)
+
+[node name="ChaseAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 3.2, 10.5)
+
+[node name="ForwardMarker" type="Marker3D" parent="."]
+position = Vector3(0, 0, -5)

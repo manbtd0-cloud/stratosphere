@@ -1,0 +1,148 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/craft/frontier_vtol.tscn" id="1_craft"]
+[ext_resource type="Script" path="res://scripts/input/pilot_input_adapter.gd" id="2_input"]
+[ext_resource type="PackedScene" path="res://scenes/craft/flight_camera_rig.tscn" id="3_camera"]
+[ext_resource type="Script" path="res://scripts/game/flight_room_controller.gd" id="4_room"]
+[ext_resource type="Script" path="res://scripts/game/route_gate.gd" id="5_gate"]
+[ext_resource type="PackedScene" path="res://scenes/ui/flight_hud.tscn" id="6_hud"]
+[ext_resource type="PackedScene" path="res://scenes/flight_room/flight_room_environment.tscn" id="7_environment"]
+
+[sub_resource type="BoxShape3D" id="BoxShape_gate"]
+size = Vector3(18, 10, 2)
+
+[sub_resource type="StandardMaterial3D" id="Material_gate"]
+albedo_color = Color(0.08, 0.72, 0.92, 1)
+emission_enabled = true
+emission = Color(0.03, 0.45, 0.85, 1)
+emission_energy_multiplier = 2.5
+metallic = 0.35
+roughness = 0.22
+
+[sub_resource type="BoxMesh" id="BoxMesh_gate_pillar"]
+material = SubResource("Material_gate")
+size = Vector3(0.8, 10, 0.8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gate_bar"]
+material = SubResource("Material_gate")
+size = Vector3(18, 0.8, 0.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape_landing_zone"]
+size = Vector3(24, 5, 32)
+
+[sub_resource type="StandardMaterial3D" id="Material_landing_pad"]
+albedo_color = Color(0.14, 0.23, 0.2, 1)
+emission_enabled = true
+emission = Color(0.04, 0.32, 0.18, 1)
+emission_energy_multiplier = 1.4
+roughness = 0.68
+
+[sub_resource type="BoxMesh" id="BoxMesh_landing_pad"]
+material = SubResource("Material_landing_pad")
+size = Vector3(24, 0.2, 32)
+
+[node name="FlightRoom" type="Node3D"]
+script = ExtResource("4_room")
+
+[node name="FlightRoomEnvironment" parent="." instance=ExtResource("7_environment")]
+
+[node name="FrontierVTOL" parent="." instance=ExtResource("1_craft")]
+position = Vector3(0, 6, 0)
+
+[node name="PilotInputAdapter" type="Node" parent="."]
+script = ExtResource("2_input")
+
+[node name="FlightCameraRig" parent="." instance=ExtResource("3_camera")]
+craft_path = NodePath("../FrontierVTOL")
+
+[node name="FlightHud" parent="." instance=ExtResource("6_hud")]
+
+[node name="Route" type="Node3D" parent="."]
+
+[node name="Gate0" type="Area3D" parent="Route" groups=["route_gate"]]
+position = Vector3(0, 18, -80)
+script = ExtResource("5_gate")
+gate_index = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Route/Gate0"]
+shape = SubResource("BoxShape_gate")
+
+[node name="VisualRoot" type="Node3D" parent="Route/Gate0"]
+
+[node name="LeftPillar" type="MeshInstance3D" parent="Route/Gate0/VisualRoot"]
+position = Vector3(-8.6, 0, 0)
+mesh = SubResource("BoxMesh_gate_pillar")
+
+[node name="RightPillar" type="MeshInstance3D" parent="Route/Gate0/VisualRoot"]
+position = Vector3(8.6, 0, 0)
+mesh = SubResource("BoxMesh_gate_pillar")
+
+[node name="TopBar" type="MeshInstance3D" parent="Route/Gate0/VisualRoot"]
+position = Vector3(0, 4.6, 0)
+mesh = SubResource("BoxMesh_gate_bar")
+
+[node name="BottomBar" type="MeshInstance3D" parent="Route/Gate0/VisualRoot"]
+position = Vector3(0, -4.6, 0)
+mesh = SubResource("BoxMesh_gate_bar")
+
+[node name="Gate1" type="Area3D" parent="Route" groups=["route_gate"]]
+position = Vector3(55, 30, -175)
+script = ExtResource("5_gate")
+gate_index = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Route/Gate1"]
+shape = SubResource("BoxShape_gate")
+
+[node name="VisualRoot" type="Node3D" parent="Route/Gate1"]
+
+[node name="LeftPillar" type="MeshInstance3D" parent="Route/Gate1/VisualRoot"]
+position = Vector3(-8.6, 0, 0)
+mesh = SubResource("BoxMesh_gate_pillar")
+
+[node name="RightPillar" type="MeshInstance3D" parent="Route/Gate1/VisualRoot"]
+position = Vector3(8.6, 0, 0)
+mesh = SubResource("BoxMesh_gate_pillar")
+
+[node name="TopBar" type="MeshInstance3D" parent="Route/Gate1/VisualRoot"]
+position = Vector3(0, 4.6, 0)
+mesh = SubResource("BoxMesh_gate_bar")
+
+[node name="BottomBar" type="MeshInstance3D" parent="Route/Gate1/VisualRoot"]
+position = Vector3(0, -4.6, 0)
+mesh = SubResource("BoxMesh_gate_bar")
+
+[node name="Gate2" type="Area3D" parent="Route" groups=["route_gate"]]
+position = Vector3(-35, 16, -270)
+script = ExtResource("5_gate")
+gate_index = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Route/Gate2"]
+shape = SubResource("BoxShape_gate")
+
+[node name="VisualRoot" type="Node3D" parent="Route/Gate2"]
+
+[node name="LeftPillar" type="MeshInstance3D" parent="Route/Gate2/VisualRoot"]
+position = Vector3(-8.6, 0, 0)
+mesh = SubResource("BoxMesh_gate_pillar")
+
+[node name="RightPillar" type="MeshInstance3D" parent="Route/Gate2/VisualRoot"]
+position = Vector3(8.6, 0, 0)
+mesh = SubResource("BoxMesh_gate_pillar")
+
+[node name="TopBar" type="MeshInstance3D" parent="Route/Gate2/VisualRoot"]
+position = Vector3(0, 4.6, 0)
+mesh = SubResource("BoxMesh_gate_bar")
+
+[node name="BottomBar" type="MeshInstance3D" parent="Route/Gate2/VisualRoot"]
+position = Vector3(0, -4.6, 0)
+mesh = SubResource("BoxMesh_gate_bar")
+
+[node name="LandingZone" type="Area3D" parent="."]
+position = Vector3(0, 2.5, -340)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LandingZone"]
+shape = SubResource("BoxShape_landing_zone")
+
+[node name="LandingPad" type="MeshInstance3D" parent="LandingZone"]
+position = Vector3(0, -2.35, 0)
+mesh = SubResource("BoxMesh_landing_pad")

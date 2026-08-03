@@ -1,0 +1,25 @@
+# Godot generated data
+.godot/
+
+# Build outputs
+build/
+exports/
+
+# Local worktrees and editor files
+.worktrees/
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Blender backups and temporary files
+*.blend1
+*.blend2
+*.blend@
+
+# OS noise
+.DS_Store
+Thumbs.db
+Desktop.ini

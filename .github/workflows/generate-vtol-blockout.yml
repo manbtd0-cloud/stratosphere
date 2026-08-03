@@ -1,0 +1,80 @@
+name: Generate VTOL Blockout
+
+on:
+  push:
+    branches:
+      - "agent/**"
+    paths:
+      - tools/blender/build_vtol_blockout.py
+      - tools/blender/generate_vtol_blockout.py
+      - .github/workflows/generate-vtol-blockout.yml
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Branch to regenerate and update
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.target_branch || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Install Blender exporter dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes blender python3-numpy
+          blender --version
+          blender --background --python-expr "import numpy; print('Blender numpy', numpy.__version__)"
+
+      - name: Adapt preview renderer for runner Blender
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("tools/blender/generate_vtol_blockout.py")
+          source = path.read_text(encoding="utf-8")
+          source = source.replace(
+              'scene.render.engine = "BLENDER_EEVEE_NEXT"',
+              'scene.render.engine = "BLENDER_EEVEE"',
+          )
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Generate corrected source and runtime assets
+        run: |
+          blender --background --python tools/blender/build_vtol_blockout.py
+          test -s assets/source/vtol_blockout.blend
+          test -s assets/generated/vtol_blockout.glb
+          ls -lh assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
+          cp assets/source/vtol_blockout.blend /tmp/vtol_blockout.blend
+          cp assets/generated/vtol_blockout.glb /tmp/vtol_blockout.glb
+
+      - name: Commit generated assets on latest branch head
+        shell: bash
+        env:
+          TARGET_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.target_branch || github.ref_name }}
+        run: |
+          git fetch origin "$TARGET_BRANCH"
+          git reset --hard "origin/$TARGET_BRANCH"
+          cp /tmp/vtol_blockout.blend assets/source/vtol_blockout.blend
+          cp /tmp/vtol_blockout.glb assets/generated/vtol_blockout.glb
+          git config user.name "stratosphere-asset-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
+          if git diff --cached --quiet; then
+            echo "Generated assets are unchanged."
+            exit 0
+          fi
+          git commit -m "assets: regenerate corrected VTOL blockout [skip ci]"
+          git push origin "HEAD:$TARGET_BRANCH"
