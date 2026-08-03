@@ -15,7 +15,11 @@ static func format_speed_kmh(speed_mps: float) -> String:
 
 
 static func format_vertical_speed(vertical_speed_mps: float) -> String:
-	return "%+.1f m/s" % vertical_speed_mps
+	var magnitude := floor(absf(vertical_speed_mps) * 10.0 + 0.5) / 10.0
+	var rounded_value := -magnitude if vertical_speed_mps < 0.0 else magnitude
+	if is_zero_approx(rounded_value):
+		rounded_value = 0.0
+	return "%+.1f m/s" % rounded_value
 
 
 static func format_percent(unit_value: float) -> String:
