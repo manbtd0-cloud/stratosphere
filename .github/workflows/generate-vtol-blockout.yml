@@ -6,6 +6,7 @@ on:
       - agent/phase-0-1-flight-room
     paths:
       - tools/blender/generate_vtol_blockout.py
+      - .github/workflows/generate-vtol-blockout.yml
   workflow_dispatch:
 
 permissions:
@@ -14,7 +15,7 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out branch
         uses: actions/checkout@v4
@@ -28,12 +29,32 @@ jobs:
           sudo apt-get install --yes blender
           blender --version
 
+      - name: Adapt preview renderer for runner Blender
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("tools/blender/generate_vtol_blockout.py")
+          source = path.read_text(encoding="utf-8")
+          source = source.replace(
+              'scene.render.engine = "BLENDER_EEVEE_NEXT"',
+              'scene.render.engine = "BLENDER_EEVEE"',
+          )
+          path.write_text(source, encoding="utf-8")
+          PY
+
       - name: Generate source and runtime assets
-        run: blender --background --python tools/blender/generate_vtol_blockout.py
+        run: |
+          blender --background --python tools/blender/generate_vtol_blockout.py
+          test -s assets/source/vtol_blockout.blend
+          test -s assets/generated/vtol_blockout.glb
+          ls -lh assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
 
       - name: Commit generated assets
         shell: bash
         run: |
+          git checkout -- tools/blender/generate_vtol_blockout.py
           git config user.name "stratosphere-asset-bot"
           git config user.email "actions@users.noreply.github.com"
           git add assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
@@ -42,4 +63,6 @@ jobs:
             exit 0
           fi
           git commit -m "assets: regenerate VTOL blockout [skip ci]"
+          git fetch origin agent/phase-0-1-flight-room
+          git rebase origin/agent/phase-0-1-flight-room
           git push origin HEAD:agent/phase-0-1-flight-room
