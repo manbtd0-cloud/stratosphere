@@ -57,6 +57,23 @@ func test_collective_accumulates_and_clamps() -> void:
 	adapter.free()
 
 
+func test_new_and_reset_controls_start_near_hover_collective() -> void:
+	var adapter := PilotInputAdapter.new()
+
+	var initial := adapter.compose_command(Vector2.ZERO, {}, 0.0)
+	TestAssert.is_near(initial.collective, 0.74, 0.000001)
+
+	adapter.compose_command(
+		Vector2.ZERO,
+		{"collective_down": 1.0},
+		1.0
+	)
+	adapter.reset_controls()
+	var reset := adapter.compose_command(Vector2.ZERO, {}, 0.0)
+	TestAssert.is_near(reset.collective, 0.74, 0.000001)
+	adapter.free()
+
+
 func test_required_input_actions_are_created() -> void:
 	var adapter := PilotInputAdapter.new()
 	adapter.ensure_input_actions()
