@@ -19,6 +19,7 @@ func test_controller_owns_physics_integration_contract() -> void:
 
 	TestAssert.is_true(craft.custom_integrator)
 	TestAssert.is_near(craft.mass, 4200.0, 0.000001)
+	TestAssert.is_near(craft.gravity_scale, 1.0, 0.000001)
 	TestAssert.is_true(craft.contact_monitor)
 	TestAssert.is_equal(craft.max_contacts_reported, 8)
 	TestAssert.is_true(craft.continuous_cd)
