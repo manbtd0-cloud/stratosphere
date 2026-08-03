@@ -33,6 +33,7 @@ PANEL_COLOR = (0.12, 0.16, 0.19, 1.0)
 ACCENT_COLOR = (0.82, 0.22, 0.055, 1.0)
 GLASS_COLOR = (0.025, 0.11, 0.16, 1.0)
 EMISSIVE_COLOR = (0.04, 0.55, 0.9, 1.0)
+HALF_TURN_RADIANS = 3.141592653589793
 
 
 def parse_args() -> argparse.Namespace:
@@ -205,6 +206,9 @@ def build_vtol() -> bpy.types.Object:
     bpy.context.collection.objects.link(root)
     root.empty_display_type = "PLAIN_AXES"
     root.empty_display_size = 0.8
+    # Blender's +Y maps to Godot/glTF -Z. The authored nose points toward
+    # Blender -Y, so rotate the complete hierarchy once at the export root.
+    root.rotation_euler.z = HALF_TURN_RADIANS
 
     add_beveled_box(
         "Body",
@@ -251,7 +255,9 @@ def build_vtol() -> bpy.types.Object:
     ]
     add_wedge("CockpitShell", cockpit_vertices, cockpit_faces, glass_material, root)
 
-    for side, x_position in (("Left", -3.55), ("Right", 3.55)):
+    # The root half-turn flips X too, so author semantic left/right on the
+    # opposite Blender side to preserve the names after export.
+    for side, x_position in (("Left", 3.55), ("Right", -3.55)):
         pod = add_beveled_box(
             f"{side}EnginePod",
             (x_position, 0.35, 0.05),
@@ -368,12 +374,12 @@ def render_previews(root: bpy.types.Object) -> None:
     scene.camera = camera
 
     views = {
-        "front": (0.0, -15.0, 3.0),
-        "rear": (0.0, 15.0, 3.0),
+        "front": (0.0, 15.0, 3.0),
+        "rear": (0.0, -15.0, 3.0),
         "left": (-15.0, 0.0, 3.0),
         "right": (15.0, 0.0, 3.0),
         "top": (0.0, 0.0, 18.0),
-        "cockpit": (4.5, -8.0, 4.0),
+        "cockpit": (4.5, 8.0, 4.0),
     }
     for view_name, location in views.items():
         camera.location = location
