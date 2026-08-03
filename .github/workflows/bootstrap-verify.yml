@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - agent/phase-0-1-flight-room
+      - main
+      - "agent/**"
   pull_request:
     branches:
       - main
