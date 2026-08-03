@@ -37,6 +37,28 @@ func test_exhaust_length_has_visible_idle_and_bounded_maximum() -> void:
 	TestAssert.is_near(FlightFeedback.calculate_exhaust_length(4.0), 3.2, 0.000001)
 
 
+func test_audio_shutdown_releases_generator_playbacks() -> void:
+	var packed: PackedScene = load("res://scenes/craft/frontier_vtol.tscn")
+	var craft := packed.instantiate()
+	var tree := Engine.get_main_loop() as SceneTree
+	tree.root.add_child(craft)
+
+	var feedback := craft.get_node("FlightFeedback") as FlightFeedback
+	var engine_audio := feedback.get_node("EngineAudio") as AudioStreamPlayer3D
+	var wind_audio := feedback.get_node("WindAudio") as AudioStreamPlayer3D
+
+	TestAssert.is_true(feedback.has_active_audio_playback())
+	feedback.shutdown_audio()
+	TestAssert.is_true(not feedback.has_active_audio_playback())
+	TestAssert.is_true(not engine_audio.playing)
+	TestAssert.is_true(not wind_audio.playing)
+	TestAssert.is_equal(engine_audio.stream, null)
+	TestAssert.is_equal(wind_audio.stream, null)
+
+	tree.root.remove_child(craft)
+	craft.free()
+
+
 func test_environment_scene_contains_scale_landmarks_and_runway_lights() -> void:
 	var packed: PackedScene = load("res://scenes/flight_room/flight_room_environment.tscn")
 	var environment := packed.instantiate()
