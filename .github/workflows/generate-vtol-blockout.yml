@@ -5,6 +5,7 @@ on:
     branches:
       - agent/phase-0-1-flight-room
     paths:
+      - tools/blender/build_vtol_blockout.py
       - tools/blender/generate_vtol_blockout.py
       - .github/workflows/generate-vtol-blockout.yml
   workflow_dispatch:
@@ -45,9 +46,9 @@ jobs:
           path.write_text(source, encoding="utf-8")
           PY
 
-      - name: Generate source and runtime assets
+      - name: Generate corrected source and runtime assets
         run: |
-          blender --background --python tools/blender/generate_vtol_blockout.py
+          blender --background --python tools/blender/build_vtol_blockout.py
           test -s assets/source/vtol_blockout.blend
           test -s assets/generated/vtol_blockout.glb
           ls -lh assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
@@ -68,5 +69,5 @@ jobs:
             echo "Generated assets are unchanged."
             exit 0
           fi
-          git commit -m "assets: regenerate VTOL blockout [skip ci]"
+          git commit -m "assets: regenerate corrected VTOL blockout [skip ci]"
           git push origin HEAD:agent/phase-0-1-flight-room
