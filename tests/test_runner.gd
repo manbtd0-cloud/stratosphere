@@ -10,6 +10,7 @@ const TEST_SUITES := [
 	preload("res://tests/unit/test_pilot_input_adapter.gd"),
 	preload("res://tests/unit/test_flight_camera_rig.gd"),
 	preload("res://tests/integration/test_flight_room_loop.gd"),
+	preload("res://tests/unit/test_flight_hud.gd"),
 ]
 
 
