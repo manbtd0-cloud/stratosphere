@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3]
+
+[sub_resource type="Environment" id="Environment_bootstrap"]
+background_mode = 1
+background_color = Color(0.035, 0.052, 0.085, 1)
+
+[node name="FlightRoom" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_bootstrap")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-48, -25, 0)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="BootstrapCamera" type="Camera3D" parent="."]
+position = Vector3(0, 8, 18)
+rotation_degrees = Vector3(-14, 0, 0)
+current = true
