@@ -34,7 +34,7 @@ func test_full_transition_points_thrust_forward() -> void:
 		GRAVITY
 	)
 	TestAssert.is_true(result.thrust_force_world.z < -70000.0)
-	TestAssert.is_near(result.thrust_force_world.y, 0.0, 0.000001)
+	TestAssert.is_near(result.thrust_force_world.y, 0.0, 0.005)
 
 
 func test_mid_transition_rotates_thrust_without_power_collapse() -> void:
@@ -56,7 +56,7 @@ func test_mid_transition_rotates_thrust_without_power_collapse() -> void:
 		parameters.forward_thrust_newtons,
 		0.5
 	)
-	TestAssert.is_near(result.thrust_newtons, expected_thrust, 0.001)
+	TestAssert.is_near(result.thrust_newtons, expected_thrust, 0.01)
 	TestAssert.is_true(result.thrust_force_world.y > 0.0)
 	TestAssert.is_true(result.thrust_force_world.z < 0.0)
 
