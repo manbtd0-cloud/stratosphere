@@ -7,12 +7,6 @@ on:
     paths:
       - tools/blender/generate_vtol_blockout.py
       - .github/workflows/generate-vtol-blockout.yml
-  pull_request:
-    branches:
-      - main
-    paths:
-      - tools/blender/generate_vtol_blockout.py
-      - .github/workflows/generate-vtol-blockout.yml
   workflow_dispatch:
 
 permissions:
@@ -20,7 +14,6 @@ permissions:
 
 jobs:
   generate:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -58,11 +51,16 @@ jobs:
           test -s assets/source/vtol_blockout.blend
           test -s assets/generated/vtol_blockout.glb
           ls -lh assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
+          cp assets/source/vtol_blockout.blend /tmp/vtol_blockout.blend
+          cp assets/generated/vtol_blockout.glb /tmp/vtol_blockout.glb
 
-      - name: Commit generated assets
+      - name: Commit generated assets on latest branch head
         shell: bash
         run: |
-          git checkout -- tools/blender/generate_vtol_blockout.py
+          git fetch origin agent/phase-0-1-flight-room
+          git reset --hard origin/agent/phase-0-1-flight-room
+          cp /tmp/vtol_blockout.blend assets/source/vtol_blockout.blend
+          cp /tmp/vtol_blockout.glb assets/generated/vtol_blockout.glb
           git config user.name "stratosphere-asset-bot"
           git config user.email "actions@users.noreply.github.com"
           git add assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
@@ -71,6 +69,4 @@ jobs:
             exit 0
           fi
           git commit -m "assets: regenerate VTOL blockout [skip ci]"
-          git fetch origin agent/phase-0-1-flight-room
-          git rebase origin/agent/phase-0-1-flight-room
           git push origin HEAD:agent/phase-0-1-flight-room
