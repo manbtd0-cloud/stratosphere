@@ -63,6 +63,9 @@ func test_manifest_generation_paths_are_repository_relative() -> void:
 func test_exported_model_uses_godot_forward_axis() -> void:
 	var packed: PackedScene = load(RUNTIME_GLB_PATH)
 	var model := packed.instantiate() as Node3D
+	var tree := Engine.get_main_loop() as SceneTree
+	tree.root.add_child(model)
+
 	var forward_marker := model.find_child("ForwardMarker", true, false) as Node3D
 	var cockpit_anchor := model.find_child("CockpitAnchor", true, false) as Node3D
 
@@ -79,4 +82,5 @@ func test_exported_model_uses_godot_forward_axis() -> void:
 			"CockpitAnchor must remain toward the craft nose"
 		)
 
+	tree.root.remove_child(model)
 	model.free()
