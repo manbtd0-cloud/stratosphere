@@ -6,7 +6,7 @@ The current milestone is the Phase 0–1 flight-room prototype: prove that the c
 
 ## Requirements
 
-- Godot 4.7.1
+- Godot 4.6.3 stable
 - Python 3.12 or newer
 - PowerShell 7 on Windows
 - Blender 5.2 when generated vehicle assets are introduced
