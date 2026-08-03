@@ -12,6 +12,7 @@ const REQUIRED_PATHS := [
 	"res://scripts/flight/flight_model.gd",
 	"res://scripts/flight/frontier_vtol_controller.gd",
 	"res://scripts/flight/flight_feedback.gd",
+	"res://scripts/flight/procedural_audio_player_3d.gd",
 	"res://scripts/input/pilot_input_adapter.gd",
 	"res://scripts/camera/flight_camera_rig.gd",
 	"res://scripts/game/flight_room_controller.gd",
