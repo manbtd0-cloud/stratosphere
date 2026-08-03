@@ -13,6 +13,7 @@ const TEST_SUITES := [
 	preload("res://tests/unit/test_flight_hud.gd"),
 	preload("res://tests/unit/test_asset_manifest_validator.gd"),
 	preload("res://tests/unit/test_flight_feedback.gd"),
+	preload("res://tests/unit/test_project_contract_validator.gd"),
 ]
 
 
