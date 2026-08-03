@@ -22,6 +22,7 @@ const REQUIRED_PATHS := [
 	"res://tools/blender/build_vtol_blockout.py",
 	"res://tools/blender/generate_vtol_blockout.py",
 	"res://tools/verify/verify.py",
+	"res://tests/gameplay_smoke_runner.gd",
 ]
 
 const EXPECTED_MAIN_SCENE := "res://scenes/flight_room/flight_room.tscn"
