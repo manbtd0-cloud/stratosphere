@@ -12,6 +12,7 @@ const STATE_COMPLETED: int = 2
 @export var input_adapter_path: NodePath = NodePath("PilotInputAdapter")
 @export var camera_rig_path: NodePath = NodePath("FlightCameraRig")
 @export var landing_zone_path: NodePath = NodePath("LandingZone")
+@export var hud_path: NodePath = NodePath("FlightHud")
 
 var _state: int = STATE_FLYING
 var _total_gates: int = 0
@@ -23,6 +24,7 @@ var _craft: FrontierVtolController
 var _input_adapter: PilotInputAdapter
 var _camera_rig: FlightCameraRig
 var _landing_zone: Area3D
+var _hud: FlightHud
 var _gates: Array[RouteGate] = []
 
 
@@ -35,6 +37,7 @@ func _ready() -> void:
 		_spawn_transform = _craft.transform
 		_spawn_captured = true
 	_refresh_gate_states()
+	_sync_hud()
 
 
 func configure_gate_count(gate_count: int) -> void:
@@ -117,6 +120,7 @@ func _resolve_runtime_nodes() -> void:
 	_input_adapter = get_node_or_null(input_adapter_path) as PilotInputAdapter
 	_camera_rig = get_node_or_null(camera_rig_path) as FlightCameraRig
 	_landing_zone = get_node_or_null(landing_zone_path) as Area3D
+	_hud = get_node_or_null(hud_path) as FlightHud
 
 
 func _collect_route_gates() -> void:
@@ -142,6 +146,11 @@ func _connect_runtime_signals() -> void:
 		_connect_once(_landing_zone.body_exited, _on_landing_body_exited)
 	for gate in _gates:
 		_connect_once(gate.vehicle_passed, try_pass_gate)
+	if _hud != null:
+		_connect_once(route_progress_changed, _hud.set_route_progress)
+		_connect_once(state_changed, _hud.set_state)
+		if _craft != null:
+			_connect_once(_craft.telemetry_updated, _hud.update_telemetry)
 
 
 func _refresh_gate_states() -> void:
@@ -158,6 +167,15 @@ func _set_state(value: int) -> void:
 	_state = value
 	_refresh_gate_states()
 	state_changed.emit(_state)
+
+
+func _sync_hud() -> void:
+	if _hud == null:
+		return
+	_hud.set_route_progress(_next_gate_index, _total_gates)
+	_hud.set_state(_state)
+	if _craft != null:
+		_hud.update_telemetry(_craft.get_telemetry())
 
 
 func _gate_index_before(left: RouteGate, right: RouteGate) -> bool:
