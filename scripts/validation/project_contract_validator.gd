@@ -17,6 +17,9 @@ const REQUIRED_PATHS := [
 	"res://scripts/game/flight_room_controller.gd",
 	"res://scripts/validation/asset_manifest_validator.gd",
 	"res://assets/generated/vtol_blockout.asset.json",
+	"res://assets/generated/vtol_blockout.glb",
+	"res://assets/source/vtol_blockout.blend",
+	"res://tools/blender/build_vtol_blockout.py",
 	"res://tools/blender/generate_vtol_blockout.py",
 	"res://tools/verify/verify.py",
 ]
