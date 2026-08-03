@@ -24,6 +24,7 @@ REQUIRED_PATHS = (
     "scripts/flight/flight_model.gd",
     "scripts/flight/frontier_vtol_controller.gd",
     "scripts/flight/flight_feedback.gd",
+    "scripts/flight/procedural_audio_player_3d.gd",
     "scripts/input/pilot_input_adapter.gd",
     "scripts/camera/flight_camera_rig.gd",
     "scripts/game/flight_room_controller.gd",
