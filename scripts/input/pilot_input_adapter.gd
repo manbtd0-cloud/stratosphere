@@ -5,6 +5,8 @@ signal command_updated(command: PilotCommand)
 signal camera_toggle_requested()
 signal restart_requested()
 
+const DEFAULT_HOVER_COLLECTIVE: float = 0.74
+
 const REQUIRED_ACTIONS := [
 	"flight_roll_left",
 	"flight_roll_right",
@@ -42,13 +44,15 @@ const ACTION_KEYS := {
 @export var mouse_sensitivity: float = 0.0035
 @export var collective_rate_per_second: float = 0.55
 @export var transition_rate_per_second: float = 0.45
+@export_range(0.0, 1.0, 0.01) var initial_collective: float = DEFAULT_HOVER_COLLECTIVE
 
 var _mouse_delta := Vector2.ZERO
-var _collective: float = 0.0
+var _collective: float = DEFAULT_HOVER_COLLECTIVE
 var _transition: float = 0.0
 
 
 func _ready() -> void:
+	_collective = clampf(initial_collective, 0.0, 1.0)
 	ensure_input_actions()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -135,7 +139,7 @@ func ensure_input_actions() -> void:
 
 func reset_controls() -> void:
 	_mouse_delta = Vector2.ZERO
-	_collective = 0.0
+	_collective = clampf(initial_collective, 0.0, 1.0)
 	_transition = 0.0
 
 
