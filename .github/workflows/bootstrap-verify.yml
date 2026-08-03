@@ -1,12 +1,6 @@
 name: Bootstrap Verify
 
 on:
-  push:
-    branches:
-      - agent/phase-0-1-flight-room
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
