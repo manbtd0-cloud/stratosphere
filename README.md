@@ -86,7 +86,7 @@ Output:
 - `build/windows/STRATOSPHERE.exe`
 - `build/windows/STRATOSPHERE.pck`
 
-The `Phase 0-1 Verify` workflow imports the project, runs the complete verification gate, performs the cross-platform Windows export, and retains a downloadable artifact for 14 days.
+The `Phase 0-1 Verify` workflow imports the project, runs the complete verification gate, performs the cross-platform Windows export, and retains a downloadable artifact for 14 days. It runs for `main`, pull requests into `main`, and isolated `agent/**` development branches.
 
 ## Implemented in Phase 0–1
 
