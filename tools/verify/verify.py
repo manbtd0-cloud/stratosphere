@@ -233,6 +233,18 @@ def main() -> int:
             "Godot tests",
             timeout_seconds=60,
         )
+        run(
+            [
+                godot,
+                "--headless",
+                "--path",
+                str(ROOT),
+                "--quit-after",
+                "240",
+            ],
+            "Gameplay scene smoke test",
+            timeout_seconds=60,
+        )
         if args.export_windows:
             export_windows(godot)
     except (FileNotFoundError, RuntimeError) as error:
