@@ -82,3 +82,19 @@ func test_craft_scene_contains_required_anchors() -> void:
 	TestAssert.is_true(craft.get_node_or_null("ForwardMarker") != null)
 
 	craft.free()
+
+
+func test_craft_scene_instances_generated_vtol_visual() -> void:
+	TestAssert.is_true(
+		ResourceLoader.exists("res://assets/generated/vtol_blockout.glb"),
+		"Generated VTOL GLB must be importable"
+	)
+	var packed: PackedScene = load("res://scenes/craft/frontier_vtol.tscn")
+	var craft := packed.instantiate()
+	var visual := craft.get_node_or_null("VisualRoot/GeneratedVTOL")
+
+	TestAssert.is_true(visual != null, "Craft must instance the generated VTOL visual")
+	TestAssert.is_true(visual is Node3D)
+	TestAssert.is_true(craft.get_node_or_null("CollisionShape3D") != null)
+
+	craft.free()
