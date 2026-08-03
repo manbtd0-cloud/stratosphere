@@ -1,6 +1,11 @@
 class_name FlightFeedback
 extends Node3D
 
+const AUDIO_SAMPLE_RATE: int = 22050
+const AUDIO_FRAME_COUNT: int = AUDIO_SAMPLE_RATE
+const ENGINE_BASE_FREQUENCY_HZ: float = 55.0
+const PCM_MAXIMUM: float = 32767.0
+
 @export var left_exhaust_path: NodePath = NodePath("LeftExhaust")
 @export var right_exhaust_path: NodePath = NodePath("RightExhaust")
 @export var engine_audio_path: NodePath = NodePath("EngineAudio")
@@ -8,15 +13,10 @@ extends Node3D
 
 var _engine_intensity: float = 0.0
 var _wind_intensity: float = 0.0
-var _engine_phase: float = 0.0
-var _wind_phase: float = 0.0
-var _noise_state: int = 0x13579BDF
 var _left_exhaust: MeshInstance3D
 var _right_exhaust: MeshInstance3D
 var _engine_audio: AudioStreamPlayer3D
 var _wind_audio: AudioStreamPlayer3D
-var _engine_playback: AudioStreamGeneratorPlayback
-var _wind_playback: AudioStreamGeneratorPlayback
 var _connected_craft: FrontierVtolController
 
 
@@ -56,8 +56,8 @@ func _ready() -> void:
 	):
 		_connected_craft.telemetry_updated.connect(update_from_telemetry)
 
-	_start_generator(_engine_audio)
-	_start_generator(_wind_audio)
+	_start_loop(_engine_audio, _create_engine_stream())
+	_start_loop(_wind_audio, _create_wind_stream())
 	_refresh_exhausts()
 
 
@@ -76,11 +76,6 @@ func _exit_tree() -> void:
 	_connected_craft = null
 
 
-func _process(_delta: float) -> void:
-	_fill_engine_audio()
-	_fill_wind_audio()
-
-
 func update_from_telemetry(telemetry: Dictionary) -> void:
 	_engine_intensity = calculate_engine_intensity(
 		float(telemetry.get("collective", 0.0)),
@@ -96,14 +91,16 @@ func update_from_telemetry(telemetry: Dictionary) -> void:
 		_engine_audio.pitch_scale = lerpf(0.72, 1.35, _engine_intensity)
 	if _wind_audio != null:
 		_wind_audio.volume_db = lerpf(-48.0, -8.0, _wind_intensity)
+		_wind_audio.pitch_scale = lerpf(0.72, 1.18, _wind_intensity)
 
 
 func has_active_audio_playback() -> bool:
 	return (
-		_engine_playback != null
-		or _wind_playback != null
-		or (is_instance_valid(_engine_audio) and _engine_audio.playing)
-		or (is_instance_valid(_wind_audio) and _wind_audio.playing)
+		is_instance_valid(_engine_audio)
+		and (_engine_audio.playing or _engine_audio.stream != null)
+	) or (
+		is_instance_valid(_wind_audio)
+		and (_wind_audio.playing or _wind_audio.stream != null)
 	)
 
 
@@ -114,20 +111,74 @@ func shutdown_audio() -> void:
 	if is_instance_valid(_wind_audio):
 		_wind_audio.stop()
 		_wind_audio.stream = null
-	_engine_playback = null
-	_wind_playback = null
 
 
-func _start_generator(player: AudioStreamPlayer3D) -> void:
-	if player == null or not player.stream is AudioStreamGenerator:
+func _start_loop(player: AudioStreamPlayer3D, stream: AudioStreamWAV) -> void:
+	if player == null or stream == null:
 		return
-	if not player.playing:
-		player.play()
-	var playback := player.get_stream_playback()
-	if player == _engine_audio:
-		_engine_playback = playback as AudioStreamGeneratorPlayback
-	elif player == _wind_audio:
-		_wind_playback = playback as AudioStreamGeneratorPlayback
+	player.stream = stream
+	player.play()
+
+
+func _create_engine_stream() -> AudioStreamWAV:
+	var samples := PackedByteArray()
+	samples.resize(AUDIO_FRAME_COUNT * 4)
+
+	for frame in range(AUDIO_FRAME_COUNT):
+		var time_seconds := float(frame) / float(AUDIO_SAMPLE_RATE)
+		var fundamental := sin(TAU * ENGINE_BASE_FREQUENCY_HZ * time_seconds)
+		var second_harmonic := sin(
+			TAU * ENGINE_BASE_FREQUENCY_HZ * 2.0 * time_seconds
+		) * 0.32
+		var third_harmonic := sin(
+			TAU * ENGINE_BASE_FREQUENCY_HZ * 3.0 * time_seconds
+		) * 0.12
+		var normalized_sample := (fundamental + second_harmonic + third_harmonic) * 0.23
+		_write_stereo_sample(samples, frame, normalized_sample)
+
+	return _build_looping_stream(samples)
+
+
+func _create_wind_stream() -> AudioStreamWAV:
+	var samples := PackedByteArray()
+	samples.resize(AUDIO_FRAME_COUNT * 4)
+	var noise_state: int = 0x13579BDF
+	var filtered_noise: float = 0.0
+
+	for frame in range(AUDIO_FRAME_COUNT):
+		noise_state = (noise_state * 1103515245 + 12345) & 0x7FFFFFFF
+		var white_noise := float(noise_state) / float(0x7FFFFFFF) * 2.0 - 1.0
+		filtered_noise = lerpf(filtered_noise, white_noise, 0.075)
+		_write_stereo_sample(samples, frame, filtered_noise * 0.34)
+
+	return _build_looping_stream(samples)
+
+
+func _build_looping_stream(samples: PackedByteArray) -> AudioStreamWAV:
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = AUDIO_SAMPLE_RATE
+	stream.stereo = true
+	stream.data = samples
+	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end = AUDIO_FRAME_COUNT
+	return stream
+
+
+func _write_stereo_sample(
+	samples: PackedByteArray,
+	frame: int,
+	normalized_sample: float
+) -> void:
+	var pcm_sample := clampi(
+		roundi(clampf(normalized_sample, -1.0, 1.0) * PCM_MAXIMUM),
+		-32768,
+		32767
+	)
+	var byte_offset := frame * 4
+	samples.encode_s16(byte_offset, pcm_sample)
+	samples.encode_s16(byte_offset + 2, pcm_sample)
 
 
 func _refresh_exhausts() -> void:
@@ -137,32 +188,3 @@ func _refresh_exhausts() -> void:
 			continue
 		exhaust.scale = Vector3(1.0, length, 1.0)
 		exhaust.visible = _engine_intensity > 0.01
-
-
-func _fill_engine_audio() -> void:
-	if _engine_playback == null or _engine_audio == null:
-		return
-	var generator := _engine_audio.stream as AudioStreamGenerator
-	if generator == null:
-		return
-	var sample_rate := generator.mix_rate
-	var available := mini(_engine_playback.get_frames_available(), 1024)
-	var base_frequency := lerpf(46.0, 92.0, _engine_intensity)
-	for _index in range(available):
-		_engine_phase = fmod(_engine_phase + base_frequency / sample_rate, 1.0)
-		var fundamental := sin(TAU * _engine_phase)
-		var harmonic := sin(TAU * _engine_phase * 2.0) * 0.32
-		var sample := (fundamental + harmonic) * lerpf(0.015, 0.16, _engine_intensity)
-		_engine_playback.push_frame(Vector2(sample, sample))
-
-
-func _fill_wind_audio() -> void:
-	if _wind_playback == null or _wind_audio == null:
-		return
-	var available := mini(_wind_playback.get_frames_available(), 1024)
-	for _index in range(available):
-		_noise_state = (_noise_state * 1103515245 + 12345) & 0x7FFFFFFF
-		var white_noise := float(_noise_state) / float(0x7FFFFFFF) * 2.0 - 1.0
-		_wind_phase = lerpf(_wind_phase, white_noise, 0.08)
-		var sample := _wind_phase * _wind_intensity * 0.12
-		_wind_playback.push_frame(Vector2(sample, sample))
