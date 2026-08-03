@@ -20,7 +20,7 @@ def resolve_godot() -> str:
         candidates.extend(
             [
                 r"C:\Tools\Godot\godot.exe",
-                r"C:\Tools\Godot\Godot_v4.7.1-stable_win64.exe",
+                r"C:\Tools\Godot\Godot_v4.6.3-stable_win64.exe",
             ]
         )
 
@@ -35,7 +35,7 @@ def resolve_godot() -> str:
             return resolved
 
     raise FileNotFoundError(
-        "Godot 4.7.1 was not found. Set GODOT_BIN or add godot/godot4 to PATH."
+        "Godot 4.6.3 stable was not found. Set GODOT_BIN or add godot/godot4 to PATH."
     )
 
 
