@@ -15,7 +15,8 @@
     "author": "STRATOSPHERE procedural asset pipeline",
     "commercial_use": true
   },
-  "generator": "tools/blender/generate_vtol_blockout.py",
+  "generator": "tools/blender/build_vtol_blockout.py",
+  "geometry_module": "tools/blender/generate_vtol_blockout.py",
   "source_blend": "assets/source/vtol_blockout.blend",
   "runtime_glb": "assets/generated/vtol_blockout.glb",
   "required_nodes": [
