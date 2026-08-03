@@ -1,0 +1,37 @@
+name: Bootstrap Verify
+
+on:
+  push:
+    branches:
+      - agent/phase-0-1-flight-room
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            --output /tmp/godot.zip \
+            "https://downloads.godotengine.org/?flavor=stable&platform=linux.64&slug=linux.x86_64.zip&version=4.7.1"
+          mkdir -p /tmp/godot
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          echo "GODOT_BIN=/tmp/godot/Godot_v4.7.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+
+      - name: Import and test project
+        run: python tools/verify/verify.py
