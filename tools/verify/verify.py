@@ -270,6 +270,7 @@ def main() -> int:
             [
                 godot,
                 "--headless",
+                "--verbose",
                 "--path",
                 str(ROOT),
                 "--quit-after",
