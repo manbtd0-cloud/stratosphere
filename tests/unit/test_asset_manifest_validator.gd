@@ -62,20 +62,20 @@ func test_manifest_generation_paths_are_repository_relative() -> void:
 
 func test_exported_model_uses_godot_forward_axis() -> void:
 	var packed: PackedScene = load(RUNTIME_GLB_PATH)
-	var model := packed.instantiate()
-	var forward_marker := model.get_node_or_null("ForwardMarker") as Node3D
-	var cockpit_anchor := model.get_node_or_null("CockpitAnchor") as Node3D
+	var model := packed.instantiate() as Node3D
+	var forward_marker := model.find_child("ForwardMarker", true, false) as Node3D
+	var cockpit_anchor := model.find_child("CockpitAnchor", true, false) as Node3D
 
 	TestAssert.is_true(forward_marker != null, "GLB must contain ForwardMarker")
 	TestAssert.is_true(cockpit_anchor != null, "GLB must contain CockpitAnchor")
 	if forward_marker != null:
 		TestAssert.is_true(
-			forward_marker.position.z < 0.0,
+			forward_marker.global_position.z < 0.0,
 			"ForwardMarker must point along Godot -Z"
 		)
 	if cockpit_anchor != null:
 		TestAssert.is_true(
-			cockpit_anchor.position.z < 0.0,
+			cockpit_anchor.global_position.z < 0.0,
 			"CockpitAnchor must remain toward the craft nose"
 		)
 
