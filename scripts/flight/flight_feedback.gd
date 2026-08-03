@@ -68,13 +68,7 @@ func _exit_tree() -> void:
 	):
 		_connected_craft.telemetry_updated.disconnect(update_from_telemetry)
 
-	if is_instance_valid(_engine_audio):
-		_engine_audio.stop()
-	if is_instance_valid(_wind_audio):
-		_wind_audio.stop()
-
-	_engine_playback = null
-	_wind_playback = null
+	shutdown_audio()
 	_engine_audio = null
 	_wind_audio = null
 	_left_exhaust = null
@@ -104,6 +98,26 @@ func update_from_telemetry(telemetry: Dictionary) -> void:
 		_wind_audio.volume_db = lerpf(-48.0, -8.0, _wind_intensity)
 
 
+func has_active_audio_playback() -> bool:
+	return (
+		_engine_playback != null
+		or _wind_playback != null
+		or (is_instance_valid(_engine_audio) and _engine_audio.playing)
+		or (is_instance_valid(_wind_audio) and _wind_audio.playing)
+	)
+
+
+func shutdown_audio() -> void:
+	if is_instance_valid(_engine_audio):
+		_engine_audio.stop()
+		_engine_audio.stream = null
+	if is_instance_valid(_wind_audio):
+		_wind_audio.stop()
+		_wind_audio.stream = null
+	_engine_playback = null
+	_wind_playback = null
+
+
 func _start_generator(player: AudioStreamPlayer3D) -> void:
 	if player == null or not player.stream is AudioStreamGenerator:
 		return
@@ -129,6 +143,8 @@ func _fill_engine_audio() -> void:
 	if _engine_playback == null or _engine_audio == null:
 		return
 	var generator := _engine_audio.stream as AudioStreamGenerator
+	if generator == null:
+		return
 	var sample_rate := generator.mix_rate
 	var available := mini(_engine_playback.get_frames_available(), 1024)
 	var base_frequency := lerpf(46.0, 92.0, _engine_intensity)
