@@ -11,6 +11,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
+FORBIDDEN_OUTPUT_MARKERS = (
+    "SCRIPT ERROR:",
+    "ERROR:",
+    "ObjectDB instances leaked",
+    "resources still in use at exit",
+    "Pages in use exist at exit",
+)
+
 
 def resolve_godot() -> str:
     configured = os.environ.get("GODOT_BIN")
@@ -39,12 +47,46 @@ def resolve_godot() -> str:
     )
 
 
-def run(command: list[str], label: str) -> None:
+def find_forbidden_output(output: str) -> list[str]:
+    return [marker for marker in FORBIDDEN_OUTPUT_MARKERS if marker in output]
+
+
+def run(command: list[str], label: str, timeout_seconds: int) -> None:
     print(f"\n== {label} ==")
     print(" ".join(command))
-    completed = subprocess.run(command, cwd=ROOT, check=False)
+
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=ROOT,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as error:
+        partial_output = error.stdout or ""
+        if isinstance(partial_output, bytes):
+            partial_output = partial_output.decode(errors="replace")
+        if partial_output:
+            print(partial_output, end="" if partial_output.endswith("\n") else "\n")
+        raise RuntimeError(
+            f"{label} timed out after {timeout_seconds} seconds"
+        ) from error
+
+    output = completed.stdout or ""
+    if output:
+        print(output, end="" if output.endswith("\n") else "\n")
+
     if completed.returncode != 0:
         raise RuntimeError(f"{label} failed with exit code {completed.returncode}")
+
+    forbidden_markers = find_forbidden_output(output)
+    if forbidden_markers:
+        joined = ", ".join(forbidden_markers)
+        raise RuntimeError(f"{label} emitted forbidden engine output: {joined}")
 
 
 def main() -> int:
@@ -53,6 +95,7 @@ def main() -> int:
         run(
             [godot, "--headless", "--path", str(ROOT), "--editor", "--quit"],
             "Godot import",
+            timeout_seconds=120,
         )
         run(
             [
@@ -64,6 +107,7 @@ def main() -> int:
                 "res://tests/test_runner.gd",
             ],
             "Godot tests",
+            timeout_seconds=60,
         )
     except (FileNotFoundError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
