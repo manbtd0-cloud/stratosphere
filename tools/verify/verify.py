@@ -30,8 +30,21 @@ REQUIRED_PATHS = (
     "scripts/validation/asset_manifest_validator.gd",
     "scripts/validation/project_contract_validator.gd",
     "assets/generated/vtol_blockout.asset.json",
+    "assets/generated/vtol_blockout.glb",
+    "assets/source/vtol_blockout.blend",
+    "tools/blender/build_vtol_blockout.py",
     "tools/blender/generate_vtol_blockout.py",
     "tests/test_runner.gd",
+)
+
+GENERATED_ASSET_PATHS = (
+    "assets/generated/vtol_blockout.glb",
+    "assets/source/vtol_blockout.blend",
+)
+
+BLENDER_SCRIPT_PATHS = (
+    "tools/blender/build_vtol_blockout.py",
+    "tools/blender/generate_vtol_blockout.py",
 )
 
 FORBIDDEN_OUTPUT_MARKERS = (
@@ -46,6 +59,8 @@ EXPECTED_MAIN_SCENE = 'run/main_scene="res://scenes/flight_room/flight_room.tscn
 EXPECTED_PHYSICS_TICKS = "common/physics_ticks_per_second=120"
 EXPECTED_EXPORT_PRESET = 'name="Windows Desktop"'
 EXPECTED_EXPORT_PATH = 'export_path="build/windows/STRATOSPHERE.exe"'
+EXPECTED_ASSET_GENERATOR = "tools/blender/build_vtol_blockout.py"
+MAX_GENERATED_FILE_BYTES = 100 * 1024 * 1024
 WINDOWS_OUTPUT = ROOT / "build" / "windows" / "STRATOSPHERE.exe"
 WINDOWS_PCK = ROOT / "build" / "windows" / "STRATOSPHERE.pck"
 
@@ -94,6 +109,18 @@ def validate_repository_contract() -> None:
         if not (ROOT / relative_path).is_file():
             errors.append(f"Missing required file: {relative_path}")
 
+    for relative_path in GENERATED_ASSET_PATHS:
+        asset_path = ROOT / relative_path
+        if not asset_path.is_file():
+            continue
+        size = asset_path.stat().st_size
+        if size <= 0:
+            errors.append(f"Generated asset is empty: {relative_path}")
+        if size > MAX_GENERATED_FILE_BYTES:
+            errors.append(
+                f"Generated asset exceeds 100 MB repository budget: {relative_path}"
+            )
+
     project_path = ROOT / "project.godot"
     if project_path.is_file():
         project_text = project_path.read_text(encoding="utf-8")
@@ -123,14 +150,20 @@ def validate_repository_contract() -> None:
                 errors.append("VTOL asset manifest up axis must be +Y")
             if manifest.get("unit_scale_meters") != 1.0:
                 errors.append("VTOL asset manifest unit scale must be 1.0 meter")
+            if manifest.get("generator") != EXPECTED_ASSET_GENERATOR:
+                errors.append(
+                    "VTOL asset manifest must use the Godot-axis build orchestrator"
+                )
 
-    generator_path = ROOT / "tools" / "blender" / "generate_vtol_blockout.py"
-    if generator_path.is_file():
-        generator_source = generator_path.read_text(encoding="utf-8")
+    for relative_path in BLENDER_SCRIPT_PATHS:
+        script_path = ROOT / relative_path
+        if not script_path.is_file():
+            continue
+        source = script_path.read_text(encoding="utf-8")
         try:
-            compile(generator_source, str(generator_path), "exec")
+            compile(source, str(script_path), "exec")
         except SyntaxError as error:
-            errors.append(f"Blender generator has invalid Python syntax: {error}")
+            errors.append(f"Blender script has invalid Python syntax: {error}")
 
     if errors:
         formatted = "\n".join(f"- {error}" for error in errors)
