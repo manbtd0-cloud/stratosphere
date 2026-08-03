@@ -1,0 +1,45 @@
+name: Generate VTOL Blockout
+
+on:
+  push:
+    branches:
+      - agent/phase-0-1-flight-room
+    paths:
+      - tools/blender/generate_vtol_blockout.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase-0-1-flight-room
+          fetch-depth: 0
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes blender
+          blender --version
+
+      - name: Generate source and runtime assets
+        run: blender --background --python tools/blender/generate_vtol_blockout.py
+
+      - name: Commit generated assets
+        shell: bash
+        run: |
+          git config user.name "stratosphere-asset-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add assets/source/vtol_blockout.blend assets/generated/vtol_blockout.glb
+          if git diff --cached --quiet; then
+            echo "Generated assets are unchanged."
+            exit 0
+          fi
+          git commit -m "assets: regenerate VTOL blockout [skip ci]"
+          git push origin HEAD:agent/phase-0-1-flight-room
