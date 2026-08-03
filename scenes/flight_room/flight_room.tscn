@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/craft/frontier_vtol.tscn" id="1_craft"]
+[ext_resource type="Script" path="res://scripts/input/pilot_input_adapter.gd" id="2_input"]
 
 [sub_resource type="Environment" id="Environment_bootstrap"]
 background_mode = 1
@@ -38,6 +39,9 @@ mesh = SubResource("BoxMesh_ground")
 
 [node name="FrontierVTOL" parent="." instance=ExtResource("1_craft")]
 position = Vector3(0, 6, 0)
+
+[node name="PilotInputAdapter" type="Node" parent="."]
+script = ExtResource("2_input")
 
 [node name="BootstrapCamera" type="Camera3D" parent="."]
 position = Vector3(0, 9, 22)
