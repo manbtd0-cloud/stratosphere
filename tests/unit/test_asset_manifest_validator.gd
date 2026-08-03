@@ -7,7 +7,10 @@ const MANIFEST_PATH := "res://assets/generated/vtol_blockout.asset.json"
 func test_manifest_is_valid_and_complete() -> void:
 	var result := AssetManifestValidator.validate_path(MANIFEST_PATH)
 
-	TestAssert.is_true(result.is_valid, "Manifest validation failed: %s" % result.errors)
+	TestAssert.is_true(
+		result.is_valid,
+		"Manifest validation failed: %s" % [result.errors]
+	)
 
 
 func test_manifest_uses_locked_orientation_and_units() -> void:
