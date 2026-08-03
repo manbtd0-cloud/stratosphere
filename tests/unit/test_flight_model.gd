@@ -17,10 +17,10 @@ func test_full_hover_collective_produces_net_upward_force() -> void:
 		AIR_DENSITY,
 		GRAVITY
 	)
-	TestAssert.is_true(result.total_force_world.y > 0.0)
+	TestAssert.is_true(result.force_world.y > 0.0)
 
 
-func test_transition_rotates_thrust_forward() -> void:
+func test_full_transition_points_thrust_forward() -> void:
 	var command := PilotCommand.new()
 	command.collective = 1.0
 	command.transition = 1.0
@@ -37,6 +37,30 @@ func test_transition_rotates_thrust_forward() -> void:
 	TestAssert.is_near(result.thrust_force_world.y, 0.0, 0.000001)
 
 
+func test_mid_transition_rotates_thrust_without_power_collapse() -> void:
+	var parameters := FlightParameters.new()
+	var command := PilotCommand.new()
+	command.collective = 1.0
+	command.transition = 0.5
+	var result := FlightModel.new().calculate(
+		parameters,
+		command,
+		Basis.IDENTITY,
+		Vector3.ZERO,
+		Vector3.ZERO,
+		AIR_DENSITY,
+		GRAVITY
+	)
+	var expected_thrust := lerpf(
+		parameters.hover_thrust_newtons,
+		parameters.forward_thrust_newtons,
+		0.5
+	)
+	TestAssert.is_near(result.thrust_newtons, expected_thrust, 0.001)
+	TestAssert.is_true(result.thrust_force_world.y > 0.0)
+	TestAssert.is_true(result.thrust_force_world.z < 0.0)
+
+
 func test_drag_opposes_velocity() -> void:
 	var result := FlightModel.new().calculate(
 		FlightParameters.new(),
@@ -50,13 +74,25 @@ func test_drag_opposes_velocity() -> void:
 	TestAssert.is_true(result.drag_force_world.z > 0.0)
 	TestAssert.is_near(result.drag_force_world.x, 0.0, 0.000001)
 	TestAssert.is_near(result.drag_force_world.y, 0.0, 0.000001)
+	TestAssert.is_true(result.drag_newtons > 0.0)
 
 
-func test_pitch_input_creates_local_x_torque() -> void:
+func test_rotation_input_changes_torque_but_not_linear_force() -> void:
+	var model := FlightModel.new()
+	var parameters := FlightParameters.new()
+	var neutral := model.calculate(
+		parameters,
+		PilotCommand.new(),
+		Basis.IDENTITY,
+		Vector3.ZERO,
+		Vector3.ZERO,
+		AIR_DENSITY,
+		GRAVITY
+	)
 	var command := PilotCommand.new()
 	command.pitch = 1.0
-	var result := FlightModel.new().calculate(
-		FlightParameters.new(),
+	var rotated := model.calculate(
+		parameters,
 		command,
 		Basis.IDENTITY,
 		Vector3.ZERO,
@@ -64,8 +100,9 @@ func test_pitch_input_creates_local_x_torque() -> void:
 		AIR_DENSITY,
 		GRAVITY
 	)
-	TestAssert.is_true(result.total_torque_world.x > 0.0)
-	TestAssert.is_near(result.total_torque_world.y, 0.0, 0.000001)
+	TestAssert.is_near(rotated.force_world.distance_to(neutral.force_world), 0.0, 0.000001)
+	TestAssert.is_true(rotated.torque_world.x > 0.0)
+	TestAssert.is_near(rotated.torque_world.y, 0.0, 0.000001)
 
 
 func test_one_second_hover_is_repeatable_and_climbs() -> void:
@@ -93,6 +130,6 @@ func _simulate_hover_second() -> Vector3:
 			AIR_DENSITY,
 			GRAVITY
 		)
-		velocity += result.total_force_world / parameters.mass_kg * delta
+		velocity += result.force_world / parameters.mass_kg * delta
 
 	return velocity
