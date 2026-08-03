@@ -35,6 +35,7 @@ REQUIRED_PATHS = (
     "tools/blender/build_vtol_blockout.py",
     "tools/blender/generate_vtol_blockout.py",
     "tests/test_runner.gd",
+    "tests/gameplay_smoke_runner.gd",
 )
 
 GENERATED_ASSET_PATHS = (
@@ -273,8 +274,8 @@ def main() -> int:
                 "--verbose",
                 "--path",
                 str(ROOT),
-                "--quit-after",
-                "240",
+                "--script",
+                "res://tests/gameplay_smoke_runner.gd",
             ],
             "Gameplay scene smoke test",
             timeout_seconds=60,
