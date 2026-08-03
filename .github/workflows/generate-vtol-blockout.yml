@@ -8,13 +8,6 @@ on:
       - tools/blender/build_vtol_blockout.py
       - tools/blender/generate_vtol_blockout.py
       - .github/workflows/generate-vtol-blockout.yml
-  pull_request:
-    branches:
-      - main
-    paths:
-      - tools/blender/build_vtol_blockout.py
-      - tools/blender/generate_vtol_blockout.py
-      - .github/workflows/generate-vtol-blockout.yml
   workflow_dispatch:
 
 permissions:
@@ -22,7 +15,6 @@ permissions:
 
 jobs:
   generate:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
