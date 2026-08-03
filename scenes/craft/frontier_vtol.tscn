@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/flight/frontier_vtol_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/flight/flight_feedback.gd" id="2_feedback"]
@@ -22,14 +22,6 @@ bottom_radius = 0.34
 height = 1.0
 radial_segments = 12
 rings = 2
-
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_engine"]
-mix_rate = 22050.0
-buffer_length = 0.35
-
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_wind"]
-mix_rate = 22050.0
-buffer_length = 0.35
 
 [node name="FrontierVTOL" type="RigidBody3D"]
 mass = 4200.0
@@ -61,13 +53,11 @@ rotation_degrees = Vector3(90, 0, 0)
 mesh = SubResource("CylinderMesh_exhaust")
 
 [node name="EngineAudio" type="AudioStreamPlayer3D" parent="FlightFeedback"]
-stream = SubResource("AudioStreamGenerator_engine")
 volume_db = -32.0
 unit_size = 8.0
 max_distance = 1200.0
 
 [node name="WindAudio" type="AudioStreamPlayer3D" parent="FlightFeedback"]
-stream = SubResource("AudioStreamGenerator_wind")
 volume_db = -48.0
 unit_size = 18.0
 max_distance = 1200.0
