@@ -18,13 +18,19 @@ func calculate(
 	var up := orientation.y.normalized()
 	var forward := -orientation.z.normalized()
 
-	var thrust_direction := up.slerp(forward, clean.transition).normalized()
+	var thrust_direction := up
+	if clean.transition >= 1.0:
+		thrust_direction = forward
+	elif clean.transition > 0.0:
+		thrust_direction = up.slerp(forward, clean.transition).normalized()
+
 	var available_thrust := lerpf(
 		parameters.hover_thrust_newtons,
 		parameters.forward_thrust_newtons,
 		clean.transition
 	)
-	var primary_thrust := thrust_direction * available_thrust * clean.collective
+	var primary_thrust_magnitude := available_thrust * clean.collective
+	var primary_thrust := thrust_direction * primary_thrust_magnitude
 	var local_translation := Vector3(clean.strafe.x, clean.strafe.y, -clean.strafe.z)
 	var lateral_thrust := (
 		orientation
@@ -86,7 +92,7 @@ func calculate(
 	result.gravity_force_world = gravity_force
 	result.force_world = thrust_force + drag_force + lift_force + gravity_force
 	result.torque_world = command_torque_world + stability_torque
-	result.thrust_newtons = thrust_force.length()
+	result.thrust_newtons = primary_thrust_magnitude + lateral_thrust.length()
 	result.drag_newtons = drag_magnitude
 	result.lift_newtons = lift_magnitude
 	return result
