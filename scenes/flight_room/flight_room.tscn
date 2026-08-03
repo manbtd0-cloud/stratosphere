@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/craft/frontier_vtol.tscn" id="1_craft"]
 [ext_resource type="Script" path="res://scripts/input/pilot_input_adapter.gd" id="2_input"]
@@ -6,21 +6,7 @@
 [ext_resource type="Script" path="res://scripts/game/flight_room_controller.gd" id="4_room"]
 [ext_resource type="Script" path="res://scripts/game/route_gate.gd" id="5_gate"]
 [ext_resource type="PackedScene" path="res://scenes/ui/flight_hud.tscn" id="6_hud"]
-
-[sub_resource type="Environment" id="Environment_bootstrap"]
-background_mode = 1
-background_color = Color(0.035, 0.052, 0.085, 1)
-
-[sub_resource type="BoxShape3D" id="BoxShape_ground"]
-size = Vector3(200, 1, 400)
-
-[sub_resource type="StandardMaterial3D" id="Material_ground"]
-albedo_color = Color(0.09, 0.115, 0.12, 1)
-roughness = 0.92
-
-[sub_resource type="BoxMesh" id="BoxMesh_ground"]
-material = SubResource("Material_ground")
-size = Vector3(200, 1, 400)
+[ext_resource type="PackedScene" path="res://scenes/flight_room/flight_room_environment.tscn" id="7_environment"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_gate"]
 size = Vector3(18, 10, 2)
@@ -58,22 +44,7 @@ size = Vector3(24, 0.2, 32)
 [node name="FlightRoom" type="Node3D"]
 script = ExtResource("4_room")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_bootstrap")
-
-[node name="Sun" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-48, -25, 0)
-light_energy = 1.2
-shadow_enabled = true
-
-[node name="Ground" type="StaticBody3D" parent="."]
-position = Vector3(0, -0.5, -160)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
-shape = SubResource("BoxShape_ground")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
-mesh = SubResource("BoxMesh_ground")
+[node name="FlightRoomEnvironment" parent="." instance=ExtResource("7_environment")]
 
 [node name="FrontierVTOL" parent="." instance=ExtResource("1_craft")]
 position = Vector3(0, 6, 0)
