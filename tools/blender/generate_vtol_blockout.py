@@ -8,15 +8,17 @@ Run from the repository root:
 Optional inspection renders:
 
     blender --background --python tools/blender/generate_vtol_blockout.py -- --render-previews
+
+The generator intentionally supports Blender 3.4 through current 5.x builds so
+CI can reproduce the same source and runtime assets as the developer machine.
 """
 
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Iterator, Sequence
 
 import bpy
 from mathutils import Vector
@@ -60,13 +62,46 @@ def configure_scene() -> None:
     scene = bpy.context.scene
     scene.unit_settings.system = "METRIC"
     scene.unit_settings.scale_length = 1.0
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.engine = (
+        "BLENDER_EEVEE_NEXT" if bpy.app.version >= (4, 2, 0) else "BLENDER_EEVEE"
+    )
     scene.render.resolution_x = 1024
     scene.render.resolution_y = 1024
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.render.film_transparent = False
     scene.world.color = (0.008, 0.012, 0.018)
+
+
+def find_principled_node(material: bpy.types.Material) -> bpy.types.Node:
+    node_tree = material.node_tree
+    if node_tree is None:
+        raise RuntimeError(f"Material {material.name} has no node tree")
+    for node in node_tree.nodes:
+        if node.type == "BSDF_PRINCIPLED":
+            return node
+    raise RuntimeError(f"Material {material.name} has no Principled BSDF node")
+
+
+def set_socket_value(
+    node: bpy.types.Node,
+    aliases: Sequence[str],
+    value: object,
+    *,
+    required: bool = True,
+) -> bool:
+    """Set the first matching socket without depending on one Blender version."""
+    for socket_name in aliases:
+        socket = node.inputs.get(socket_name)
+        if socket is not None:
+            socket.default_value = value
+            return True
+    if required:
+        available = ", ".join(socket.name for socket in node.inputs)
+        raise RuntimeError(
+            f"Node {node.name} lacks sockets {tuple(aliases)}; available: {available}"
+        )
+    return False
 
 
 def make_material(
@@ -79,17 +114,18 @@ def make_material(
     material = bpy.data.materials.new(name)
     material.diffuse_color = base_color
     material.use_nodes = True
-    principled = material.node_tree.nodes.get("Principled BSDF")
-    principled.inputs["Base Color"].default_value = base_color
-    principled.inputs["Metallic"].default_value = metallic
-    principled.inputs["Roughness"].default_value = roughness
+    principled = find_principled_node(material)
+    set_socket_value(principled, ("Base Color",), base_color)
+    set_socket_value(principled, ("Metallic",), metallic)
+    set_socket_value(principled, ("Roughness",), roughness)
     if emission is not None:
-        emission_input = principled.inputs.get("Emission Color") or principled.inputs.get("Emission")
-        if emission_input is not None:
-            emission_input.default_value = emission
-        strength_input = principled.inputs.get("Emission Strength")
-        if strength_input is not None:
-            strength_input.default_value = 4.0
+        set_socket_value(principled, ("Emission Color", "Emission"), emission)
+        set_socket_value(
+            principled,
+            ("Emission Strength",),
+            4.0,
+            required=False,
+        )
     return material
 
 
@@ -103,6 +139,8 @@ def add_beveled_box(
 ) -> bpy.types.Object:
     bpy.ops.mesh.primitive_cube_add(location=location)
     obj = bpy.context.object
+    if obj is None:
+        raise RuntimeError(f"Blender did not create cube for {name}")
     obj.name = name
     obj.dimensions = dimensions
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
@@ -267,10 +305,16 @@ def build_vtol() -> bpy.types.Object:
     return root
 
 
+def descendants(root: bpy.types.Object) -> Iterator[bpy.types.Object]:
+    for child in root.children:
+        yield child
+        yield from descendants(child)
+
+
 def select_hierarchy(root: bpy.types.Object) -> None:
     bpy.ops.object.select_all(action="DESELECT")
     root.select_set(True)
-    for child in root.children_recursive:
+    for child in descendants(root):
         child.select_set(True)
     bpy.context.view_layer.objects.active = root
 
@@ -346,6 +390,7 @@ def main() -> None:
     save_outputs(root)
     if args.render_previews:
         render_previews(root)
+    print(f"Blender version: {bpy.app.version_string}")
     print(f"Saved Blender source: {SOURCE_BLEND}")
     print(f"Saved Godot runtime GLB: {RUNTIME_GLB}")
 
