@@ -96,11 +96,18 @@ func test_camera_scene_uses_default_control_profile() -> void:
 
 
 func test_chase_lookahead_does_not_move_camera_through_craft() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var test_root := Node3D.new()
+	tree.root.add_child(test_root)
+
 	var craft_scene: PackedScene = load("res://scenes/craft/frontier_vtol.tscn")
 	var craft := craft_scene.instantiate() as FrontierVtolController
 	craft.linear_velocity = Vector3(0.0, 0.0, -1000.0)
+	test_root.add_child(craft)
+
 	var rig := FlightCameraRig.new()
 	rig.control_profile = FlightControlProfile.new()
+	test_root.add_child(rig)
 	TestAssert.is_true(rig.bind_to_craft(craft))
 	var chase_anchor := craft.get_node("ChaseAnchor") as Node3D
 
@@ -111,5 +118,4 @@ func test_chase_lookahead_does_not_move_camera_through_craft() -> void:
 		0.0,
 		0.000001
 	)
-	rig.free()
-	craft.free()
+	test_root.free()
