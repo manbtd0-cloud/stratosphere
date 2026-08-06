@@ -59,7 +59,8 @@ See `docs/status/phase-0-report.md` for the exact verification state and hardwar
 
 ## Important documents
 
-- Master game design: `docs/superpowers/specs/2026-08-06-open-world-racing-game-design.md`
+- Original master game design: `docs/superpowers/specs/2026-08-06-open-world-racing-game-design.md`
+- Windows/Linux platform decision (supersedes the original Windows-only platform wording): `docs/decisions/2026-08-06-windows-linux-support.md`
 - AAA graphics foundation design: `docs/superpowers/specs/2026-08-06-aaa-graphics-foundation-design.md`
 - Phase 0 implementation plan: `docs/superpowers/plans/2026-08-06-phase-0-aaa-foundation.md`
 - Graphics and asset standard: `docs/standards/graphics-and-assets.md`
