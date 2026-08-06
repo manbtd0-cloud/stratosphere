@@ -9,6 +9,8 @@ const REQUIRED_PATHS := [
 	"res://scenes/craft/frontier_vtol.tscn",
 	"res://scenes/craft/flight_camera_rig.tscn",
 	"res://scenes/ui/flight_hud.tscn",
+	"res://scripts/flight/flight_control_profile.gd",
+	"res://resources/flight/default_flight_control_profile.tres",
 	"res://scripts/flight/flight_model.gd",
 	"res://scripts/flight/frontier_vtol_controller.gd",
 	"res://scripts/flight/flight_feedback.gd",

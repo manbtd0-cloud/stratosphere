@@ -7,6 +7,7 @@ const REQUIRED_TELEMETRY_KEYS := [
 	"transition",
 	"collective",
 	"vertical_speed_mps",
+	"angular_velocity_local_rad_s",
 	"grounded",
 	"lift_newtons",
 	"drag_newtons",
@@ -97,4 +98,30 @@ func test_craft_scene_instances_generated_vtol_visual() -> void:
 	TestAssert.is_true(visual is Node3D)
 	TestAssert.is_true(craft.get_node_or_null("CollisionShape3D") != null)
 
+	craft.free()
+
+
+func test_craft_scene_uses_default_control_profile() -> void:
+	var packed: PackedScene = load("res://scenes/craft/frontier_vtol.tscn")
+	var craft := packed.instantiate() as FrontierVtolController
+
+	TestAssert.is_true(craft.control_profile != null)
+	TestAssert.is_true(
+		craft.control_profile.resource_path.ends_with(
+			"resources/flight/default_flight_control_profile.tres"
+		)
+	)
+	craft.free()
+
+
+func test_telemetry_reports_local_angular_velocity() -> void:
+	var craft := FrontierVtolController.new()
+	craft.angular_velocity = Vector3(1.0, 2.0, 3.0)
+	var telemetry := craft.get_telemetry()
+
+	TestAssert.is_true(telemetry.has("angular_velocity_local_rad_s"))
+	var local_rate: Vector3 = telemetry["angular_velocity_local_rad_s"]
+	TestAssert.is_true(is_finite(local_rate.x))
+	TestAssert.is_true(is_finite(local_rate.y))
+	TestAssert.is_true(is_finite(local_rate.z))
 	craft.free()

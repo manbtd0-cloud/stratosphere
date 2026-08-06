@@ -34,4 +34,17 @@ func test_hud_scene_contains_required_readouts() -> void:
 	]:
 		TestAssert.is_true(readouts.get_node_or_null(label_name) != null)
 
+	TestAssert.is_true(hud.get_node_or_null("ControlDemandCue") != null)
+	TestAssert.is_true(hud.get_node_or_null("ControlDemandCue/DemandMarker") != null)
 	hud.free()
+
+
+func test_control_marker_offset_is_bounded() -> void:
+	var offset := FlightHud.control_marker_offset(Vector2(4.0, 3.0), 32.0)
+	TestAssert.is_true(offset.length() <= 32.0001)
+
+
+func test_control_marker_preserves_direction() -> void:
+	var offset := FlightHud.control_marker_offset(Vector2(0.5, -0.25), 32.0)
+	TestAssert.is_true(offset.x > 0.0)
+	TestAssert.is_true(offset.y < 0.0)

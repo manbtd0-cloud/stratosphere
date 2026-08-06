@@ -91,6 +91,9 @@ func restart_run() -> void:
 		_input_adapter.reset_controls()
 	if _camera_rig != null:
 		_camera_rig.set_mode(FlightCameraRig.MODE_CHASE)
+	if _hud != null:
+		_hud.set_camera_mode(FlightCameraRig.MODE_CHASE)
+		_hud.set_control_demand(Vector2.ZERO)
 	_set_state(STATE_FLYING)
 	route_progress_changed.emit(_next_gate_index, _total_gates)
 
@@ -138,9 +141,10 @@ func _collect_route_gates() -> void:
 func _connect_runtime_signals() -> void:
 	if _input_adapter != null:
 		_connect_once(_input_adapter.command_updated, _on_pilot_command_updated)
-	if _input_adapter != null and _camera_rig != null:
-		_connect_once(_input_adapter.camera_toggle_requested, _camera_rig.toggle_mode)
-	if _input_adapter != null:
+		_connect_once(
+			_input_adapter.camera_toggle_requested,
+			_on_camera_toggle_requested
+		)
 		_connect_once(_input_adapter.restart_requested, restart_run)
 	if _craft != null:
 		_connect_once(_craft.crashed, handle_crash)
@@ -169,8 +173,11 @@ func _set_state(value: int) -> void:
 	if _state == value:
 		return
 	_state = value
-	if not is_pilot_control_enabled() and _craft != null:
-		_craft.set_pilot_command(PilotCommand.new())
+	if not is_pilot_control_enabled():
+		if _craft != null:
+			_craft.set_pilot_command(PilotCommand.new())
+		if _hud != null:
+			_hud.set_control_demand(Vector2.ZERO)
 	_refresh_gate_states()
 	state_changed.emit(_state)
 
@@ -180,6 +187,14 @@ func _sync_hud() -> void:
 		return
 	_hud.set_route_progress(_next_gate_index, _total_gates)
 	_hud.set_state(_state)
+	_hud.set_control_demand(
+		_input_adapter.get_smoothed_control_demand()
+		if _input_adapter != null else Vector2.ZERO
+	)
+	_hud.set_camera_mode(
+		_camera_rig.get_mode()
+		if _camera_rig != null else FlightCameraRig.MODE_CHASE
+	)
 	if _craft != null:
 		_hud.update_telemetry(_craft.get_telemetry())
 
@@ -198,8 +213,20 @@ func _on_pilot_command_updated(command: PilotCommand) -> void:
 		return
 	if is_pilot_control_enabled():
 		_craft.set_pilot_command(command)
+		if _hud != null and _input_adapter != null:
+			_hud.set_control_demand(_input_adapter.get_smoothed_control_demand())
 	else:
 		_craft.set_pilot_command(PilotCommand.new())
+		if _hud != null:
+			_hud.set_control_demand(Vector2.ZERO)
+
+
+func _on_camera_toggle_requested() -> void:
+	if _camera_rig == null:
+		return
+	var mode := _camera_rig.toggle_mode()
+	if _hud != null:
+		_hud.set_camera_mode(mode)
 
 
 func _on_landing_body_entered(body: Node3D) -> void:
