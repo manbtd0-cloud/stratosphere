@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RenderQualityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/graphics/render_quality_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+profile_id = &"low"
+render_scale = 0.67
+scaling_mode = 2
+mesh_lod_threshold = 2.4
+vegetation_density = 0.55
+prop_density = 0.65
+traffic_density = 0.6
+decal_distance = 160.0
+shadow_quality = 0
+volumetric_fog_enabled = false
+ssao_enabled = false
+ssil_enabled = false
+ssr_enabled = false
+sdfgi_enabled = false
+glow_enabled = true

@@ -26,6 +26,15 @@ func _init() -> void:
 	if configured_name != "Open World Racing":
 		failures.append("application/config/name must equal Open World Racing")
 
+	var project_file := FileAccess.open("res://project.godot", FileAccess.READ)
+	var project_text := project_file.get_as_text() if project_file != null else ""
+	if not project_text.contains('renderer/rendering_method="forward_plus"'):
+		failures.append("Forward+ rendering method must be explicit")
+
+	for autoload_name in ["SettingsStore", "SaveStore", "AssetCatalog"]:
+		if not ProjectSettings.has_setting("autoload/%s" % autoload_name):
+			failures.append("missing service autoload: %s" % autoload_name)
+
 	if failures.is_empty():
 		print("PASS: project baseline contract")
 		quit(0)

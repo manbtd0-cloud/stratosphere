@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="RenderQualityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/graphics/render_quality_profile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+profile_id = &"ultra"
+render_scale = 1.0
+scaling_mode = 2
+mesh_lod_threshold = 0.8
+vegetation_density = 1.25
+prop_density = 1.2
+traffic_density = 1.15
+decal_distance = 800.0
+shadow_quality = 3
+volumetric_fog_enabled = true
+ssao_enabled = true
+ssil_enabled = true
+ssr_enabled = true
+sdfgi_enabled = true
+glow_enabled = true

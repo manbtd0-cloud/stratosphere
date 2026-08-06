@@ -1,24 +1,22 @@
-# Godot generated files
+# Godot generated data and confidential export credentials
 .godot/
 .import/
-export.cfg
-export_presets.cfg
 
-# Builds and local output
+# Generated builds, reports, and logs
 build/
 dist/
+reports/*.json
 logs/
-reports/
 *.log
 
-# IDE and OS
+# IDE and operating system
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Blender temporary files
+# Blender backup files
 *.blend1
 *.blend2
 *.blend@

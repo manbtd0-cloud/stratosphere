@@ -1,0 +1,12 @@
+res://tests/smoke/test_project_contract.gd
+res://tests/smoke/test_cross_platform_contract.gd
+res://tests/smoke/test_export_contract.gd
+res://tests/smoke/test_benchmark_contract.gd
+res://tests/unit/test_logger.gd
+res://tests/unit/test_game_settings.gd
+res://tests/unit/test_input_profile.gd
+res://tests/unit/test_render_quality_profile.gd
+res://tests/unit/test_graphics_quality_service.gd
+res://tests/unit/test_save_service.gd
+res://tests/unit/test_asset_registry.gd
+res://tests/unit/test_benchmark_report.gd
