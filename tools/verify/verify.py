@@ -21,6 +21,8 @@ REQUIRED_PATHS = (
     "scenes/craft/frontier_vtol.tscn",
     "scenes/craft/flight_camera_rig.tscn",
     "scenes/ui/flight_hud.tscn",
+    "scripts/flight/flight_control_profile.gd",
+    "resources/flight/default_flight_control_profile.tres",
     "scripts/flight/flight_model.gd",
     "scripts/flight/frontier_vtol_controller.gd",
     "scripts/flight/flight_feedback.gd",

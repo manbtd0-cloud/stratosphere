@@ -39,8 +39,8 @@ The main scene is `scenes/flight_room/flight_room.tscn`.
 
 | Input | Action |
 | --- | --- |
-| Mouse | Pitch and yaw |
-| Q / E | Roll left / right |
+| Mouse | Command smoothed pitch and yaw angular rate |
+| Q / E | Smoothed roll left / right |
 | Space / Ctrl | Raise / lower collective |
 | X / Z | Vector toward forward flight / hover |
 | F / H | Translate left / right |
@@ -50,6 +50,28 @@ The main scene is `scenes/flight_room/flight_room.tscn`.
 | F5 | Restart route |
 | Escape | Release mouse |
 | Mouse click | Recapture mouse |
+
+## Control architecture
+
+Pilot rotation commands are angular-rate demands, not direct percentages of raw torque. A bounded local-rate controller accelerates the craft toward the requested pitch, yaw, and roll rates, then actively removes angular velocity when input returns to neutral. It does not auto-level the craft and does not hold altitude.
+
+The default keyboard-and-mouse profile is `resources/flight/default_flight_control_profile.tres`. Its current starting values are:
+
+- full pitch demand: `950 px/s`
+- full yaw demand: `1050 px/s`
+- mouse response exponent: `1.35`
+- hover max rates: `65 / 52 / 78 deg/s` pitch, yaw, roll
+- forward max rates: `95 / 28 / 125 deg/s` pitch, yaw, roll
+- rate gains: `210000 / 160000 / 240000 N·m per rad/s`
+- torque limits: `220000 / 180000 / 260000 N·m`
+- nominal hover collective: `0.74`
+- hover detent window: `0.035`
+- collective rate: `0.48 per second`
+- vector input rate: `0.55 per second`
+- chase FOV: `76–92 degrees`
+- chase look-ahead: `0.28 seconds`, capped at `28 meters`
+
+The collective detent only nudges an idle control near nominal hover; it does not inspect altitude or vertical speed. Thrust-vector transition follows a smoothed target. Chase view uses separate position and rotation responses, partial roll following, bounded velocity look-ahead, and speed-dependent FOV. These values are a tested architecture baseline, not a claim that final control tuning is complete.
 
 ## Generate the VTOL asset
 
@@ -94,10 +116,14 @@ The `Phase 0-1 Verify` workflow imports the project, runs the complete verificat
 - Momentum-preserving physical VTOL model
 - Continuous hover-to-forward thrust vectoring
 - Keyboard-and-mouse pilot input
+- Bounded local angular-rate controller
+- Smoothed mouse and keyboard rotational demand
+- Idle hover-collective detent without altitude hold
 - Cockpit and craft-relative chase cameras
+- Speed-sensitive chase FOV and velocity look-ahead
 - Ordered three-gate route
 - Designated landing zone, crash state, and deterministic restart
-- Telemetry HUD and control hints
+- Telemetry HUD, control-demand cue, and control hints
 - Procedural engine hum, wind noise, and exhaust feedback
 - 400×800 meter frontier test environment with runway lighting and large landmarks
 - Generated Blender VTOL source and Godot runtime model
@@ -105,4 +131,4 @@ The `Phase 0-1 Verify` workflow imports the project, runs the complete verificat
 
 ## Deliberately deferred
 
-Open-world streaming, economy, progression, combat, dynamic weather, final vehicle art, orbital flight, moons, campaign content, and advanced damage remain separate later milestones.
+Open-world streaming, economy, progression, combat, dynamic weather, final vehicle art, orbital flight, moons, campaign content, advanced damage, gamepad/HOTAS support, control rebinding UI, and final control tuning remain separate later milestones.

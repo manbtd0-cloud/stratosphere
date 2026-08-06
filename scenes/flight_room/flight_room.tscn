@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/craft/frontier_vtol.tscn" id="1_craft"]
 [ext_resource type="Script" path="res://scripts/input/pilot_input_adapter.gd" id="2_input"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/game/route_gate.gd" id="5_gate"]
 [ext_resource type="PackedScene" path="res://scenes/ui/flight_hud.tscn" id="6_hud"]
 [ext_resource type="PackedScene" path="res://scenes/flight_room/flight_room_environment.tscn" id="7_environment"]
+[ext_resource type="Resource" path="res://resources/flight/default_flight_control_profile.tres" id="8_control_profile"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_gate"]
 size = Vector3(18, 10, 2)
@@ -51,6 +52,7 @@ position = Vector3(0, 6, 0)
 
 [node name="PilotInputAdapter" type="Node" parent="."]
 script = ExtResource("2_input")
+control_profile = ExtResource("8_control_profile")
 
 [node name="FlightCameraRig" parent="." instance=ExtResource("3_camera")]
 craft_path = NodePath("../FrontierVTOL")

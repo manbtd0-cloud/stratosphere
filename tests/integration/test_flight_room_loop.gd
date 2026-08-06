@@ -67,3 +67,35 @@ func test_pilot_control_is_enabled_only_while_flying() -> void:
 	TestAssert.is_true(not room.is_pilot_control_enabled())
 
 	room.free()
+
+
+func test_flight_room_shares_default_control_profile() -> void:
+	var packed: PackedScene = load("res://scenes/flight_room/flight_room.tscn")
+	var room := packed.instantiate()
+	var craft := room.get_node("FrontierVTOL") as FrontierVtolController
+	var input := room.get_node("PilotInputAdapter") as PilotInputAdapter
+
+	TestAssert.is_true(craft.control_profile != null)
+	TestAssert.is_true(input.control_profile != null)
+	TestAssert.is_equal(
+		craft.control_profile.resource_path,
+		input.control_profile.resource_path
+	)
+	room.free()
+
+
+func test_camera_toggle_updates_rig_and_hud_mode() -> void:
+	var room := FlightRoomController.new()
+	var rig := FlightCameraRig.new()
+	var hud_scene: PackedScene = load("res://scenes/ui/flight_hud.tscn")
+	var hud := hud_scene.instantiate() as FlightHud
+	room.set("_camera_rig", rig)
+	room.set("_hud", hud)
+
+	room.call("_on_camera_toggle_requested")
+
+	TestAssert.is_equal(rig.get_mode(), FlightCameraRig.MODE_COCKPIT)
+	TestAssert.is_equal(hud.get_camera_mode_for_test(), FlightCameraRig.MODE_COCKPIT)
+	hud.free()
+	rig.free()
+	room.free()

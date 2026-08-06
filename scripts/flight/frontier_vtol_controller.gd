@@ -11,6 +11,7 @@ enum ContactOutcome {
 }
 
 @export var parameters: FlightParameters = FlightParameters.new()
+@export var control_profile: FlightControlProfile
 @export var safe_landing_vertical_speed_mps: float = 4.0
 @export var crash_impact_speed_mps: float = 12.0
 
@@ -27,6 +28,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	_profile()
 	_apply_physics_contract()
 
 
@@ -55,6 +57,10 @@ func get_telemetry() -> Dictionary:
 		"transition": _pilot_command.transition,
 		"collective": _pilot_command.collective,
 		"vertical_speed_mps": linear_velocity.y,
+		"angular_velocity_local_rad_s": _local_angular_velocity(
+			angular_velocity,
+			transform.basis
+		),
 		"grounded": _grounded,
 		"lift_newtons": _latest_force_result.lift_newtons,
 		"drag_newtons": _latest_force_result.drag_newtons,
@@ -91,7 +97,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		state.linear_velocity,
 		state.angular_velocity,
 		air_density,
-		state.total_gravity
+		state.total_gravity,
+		_profile()
 	)
 
 	state.linear_velocity += (
@@ -144,8 +151,27 @@ func _telemetry_from_state(state: PhysicsDirectBodyState3D) -> Dictionary:
 		"transition": _pilot_command.transition,
 		"collective": _pilot_command.collective,
 		"vertical_speed_mps": state.linear_velocity.y,
+		"angular_velocity_local_rad_s": _local_angular_velocity(
+			state.angular_velocity,
+			state.transform.basis
+		),
 		"grounded": _grounded,
 		"lift_newtons": _latest_force_result.lift_newtons,
 		"drag_newtons": _latest_force_result.drag_newtons,
 		"thrust_newtons": _latest_force_result.thrust_newtons,
 	}
+
+
+func _local_angular_velocity(world_angular_velocity: Vector3, basis: Basis) -> Vector3:
+	var safe_velocity := Vector3(
+		world_angular_velocity.x if is_finite(world_angular_velocity.x) else 0.0,
+		world_angular_velocity.y if is_finite(world_angular_velocity.y) else 0.0,
+		world_angular_velocity.z if is_finite(world_angular_velocity.z) else 0.0
+	)
+	return basis.orthonormalized().transposed() * safe_velocity
+
+
+func _profile() -> FlightControlProfile:
+	if control_profile == null:
+		control_profile = FlightControlProfile.new()
+	return control_profile
