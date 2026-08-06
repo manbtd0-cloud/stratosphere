@@ -1,8 +1,19 @@
 # Open-World Racing Game
 
-This repository is the production home for a Windows-only, single-player, realistic-simcade open-world racing game built with Godot 4 Forward+.
+This repository is the production home for a single-player, realistic-simcade open-world racing game built with Godot 4 Forward+.
 
 The repository name is historical and does not define the game title, setting, or genre.
+
+## Supported development platforms
+
+Windows and Linux are supported together from the beginning. The same Godot project, scenes, GDScript, resources, tests, and gameplay systems are used on both platforms. Platform-specific work is limited to native verification wrappers, export presets, packaging, and final hardware testing.
+
+- Windows 10 or later
+- Modern x86_64 Linux distribution
+- Godot 4.7.x with Forward+ support
+- PowerShell 5.1+ on Windows or Bash on Linux
+
+The platform decision is recorded in `docs/decisions/2026-08-06-windows-linux-support.md` and supersedes the earlier Windows-only wording in the initial design snapshot.
 
 ## Approved direction
 
@@ -22,34 +33,28 @@ The repository name is historical and does not define the game title, setting, o
 
 Development starts with a polished 4–6 km² mountain-and-countryside vertical slice, backed by production-grade modular systems. The full world target is approximately 15–25 km².
 
-The initial playable slice targets:
+## Verify locally
 
-- One polished rear-wheel-drive sports coupe
-- Three to five traffic vehicles
-- One named rival
-- Garage and dealership
-- Circuit, sprint, rally, drift, and time-trial events
-- Economy, reputation, tuning, upgrades, damage, repair, saving, weather, and traffic
-
-## Repository documents
-
-- Design specification: `docs/superpowers/specs/2026-08-06-open-world-racing-game-design.md`
-- Phase 0 plan: `docs/superpowers/plans/2026-08-06-phase-0-foundation.md`
-
-## Requirements
-
-- Windows 10 or later
-- Godot 4.7.x with Forward+ support
-- PowerShell 5.1 or later
-
-## Verify the baseline
+Windows:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\verify\verify.ps1
 ```
 
-The script imports the project headlessly and runs the smoke-test contract. It does not use GitHub Actions.
+Linux:
+
+```bash
+./tools/verify/verify.sh
+```
+
+Both wrappers import the project headlessly and run the same test contracts. They do not use GitHub Actions.
+
+## Repository documents
+
+- Design specification: `docs/superpowers/specs/2026-08-06-open-world-racing-game-design.md`
+- Platform amendment: `docs/decisions/2026-08-06-windows-linux-support.md`
+- Phase 0 plan: `docs/superpowers/plans/2026-08-06-phase-0-foundation.md`
 
 ## Current status
 
-The previous repository contents were intentionally removed in one recoverable Git commit. This clean baseline begins Phase 0 of the approved racing-game design.
+The clean Godot baseline is verified. Phase 0 now includes the application event boundary, structured session logging, and matching Windows/Linux local verification entrypoints.
