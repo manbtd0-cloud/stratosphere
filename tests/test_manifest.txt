@@ -52,3 +52,4 @@ res://tests/phase1/test_39_handling_stability.gd
 res://tests/phase1/test_40_ground_contact.gd
 res://tests/phase1/test_41_tick_rate_probe.gd
 res://tests/phase1/test_42_350z_source_contract.gd
+res://tests/phase1/test_43_350z_visual_binding.gd

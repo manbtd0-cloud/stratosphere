@@ -1,8 +1,26 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/vehicle/physics/vehicle_controller.gd" id="1"]
 [ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_camera_rig.gd" id="2"]
 [ext_resource type="Script" path="res://src/vehicle/presentation/wheel_visual_controller.gd" id="3"]
+[ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_visual_rig.gd" id="4"]
+[ext_resource type="Script" path="res://src/vehicle/data/body_config.gd" id="5"]
+[ext_resource type="Script" path="res://src/vehicle/data/vehicle_definition.gd" id="6"]
+
+[sub_resource type="Resource" id="body_config"]
+script = ExtResource("5")
+mass_kg = 1180.0
+front_weight_fraction = 0.53
+wheelbase = 2.66645
+track_width = 1.56642
+drag_coefficient = 0.34
+frontal_area = 1.85
+
+[sub_resource type="Resource" id="vehicle_definition"]
+script = ExtResource("6")
+body = SubResource("body_config")
+wheel_radius = 0.306
+
 [sub_resource type="BoxShape3D" id="chassis"]
 size = Vector3(1.65, 0.28, 3.75)
 [sub_resource type="BoxMesh" id="bodymesh"]
@@ -15,64 +33,83 @@ radial_segments = 16
 
 [node name="VehicleController" type="RigidBody3D"]
 script = ExtResource("1")
+definition = SubResource("vehicle_definition")
 mass = 1180.0
 continuous_cd = true
 
 [node name="ChassisCollision" type="CollisionShape3D" parent="."]
 position = Vector3(0, -0.12, 0)
 shape = SubResource("chassis")
+
 [node name="VisualRoot" type="Node3D" parent="."]
-[node name="BodyExterior" type="MeshInstance3D" parent="VisualRoot"]
+[node name="GreyboxFallback" type="Node3D" parent="VisualRoot"]
+[node name="BodyExterior" type="MeshInstance3D" parent="VisualRoot/GreyboxFallback"]
 position = Vector3(0,0.15,0)
 mesh = SubResource("bodymesh")
-[node name="BodyInterior" type="Node3D" parent="VisualRoot"]
-[node name="Glass" type="Node3D" parent="VisualRoot"]
-[node name="Lights" type="Node3D" parent="VisualRoot"]
-[node name="WheelVisualFL" type="MeshInstance3D" parent="VisualRoot"]
-position = Vector3(-0.725,-0.32,-1.1515)
+[node name="BodyInterior" type="Node3D" parent="VisualRoot/GreyboxFallback"]
+[node name="Glass" type="Node3D" parent="VisualRoot/GreyboxFallback"]
+[node name="Lights" type="Node3D" parent="VisualRoot/GreyboxFallback"]
+[node name="WheelVisualFL" type="MeshInstance3D" parent="VisualRoot/GreyboxFallback"]
+position = Vector3(-0.783209,-0.05,-1.333225)
 rotation = Vector3(0,0,1.5707963)
 mesh = SubResource("wheelmesh")
-[node name="WheelVisualFR" type="MeshInstance3D" parent="VisualRoot"]
-position = Vector3(0.725,-0.32,-1.1515)
+[node name="WheelVisualFR" type="MeshInstance3D" parent="VisualRoot/GreyboxFallback"]
+position = Vector3(0.783209,-0.05,-1.333225)
 rotation = Vector3(0,0,1.5707963)
 mesh = SubResource("wheelmesh")
-[node name="WheelVisualRL" type="MeshInstance3D" parent="VisualRoot"]
-position = Vector3(-0.725,-0.32,1.2985)
+[node name="WheelVisualRL" type="MeshInstance3D" parent="VisualRoot/GreyboxFallback"]
+position = Vector3(-0.783209,-0.05,1.333225)
 rotation = Vector3(0,0,1.5707963)
 mesh = SubResource("wheelmesh")
-[node name="WheelVisualRR" type="MeshInstance3D" parent="VisualRoot"]
-position = Vector3(0.725,-0.32,1.2985)
+[node name="WheelVisualRR" type="MeshInstance3D" parent="VisualRoot/GreyboxFallback"]
+position = Vector3(0.783209,-0.05,1.333225)
 rotation = Vector3(0,0,1.5707963)
 mesh = SubResource("wheelmesh")
-[node name="SteeringWheelPivot" type="Node3D" parent="VisualRoot/BodyInterior"]
-position = Vector3(-0.32,0.28,-0.45)
+[node name="SteeringWheelPivot" type="Node3D" parent="VisualRoot/GreyboxFallback/BodyInterior"]
+position = Vector3(0.40,0.42,0.28)
+
+[node name="VehicleVisualRig" type="Node3D" parent="VisualRoot"]
+script = ExtResource("4")
+runtime_root = "res://assets/runtime/vehicle/prototype_rwd_coupe"
+initial_lod = 0
+model_yaw_degrees = 180.0
+model_vertical_offset = -0.39
+fallback_path = NodePath("../GreyboxFallback")
+
 [node name="WheelAnchors" type="Node3D" parent="."]
 [node name="WheelFL" type="Marker3D" parent="WheelAnchors"]
-position = Vector3(-0.725,0.15,-1.1515)
+position = Vector3(-0.783209,0.15,-1.333225)
 [node name="WheelFR" type="Marker3D" parent="WheelAnchors"]
-position = Vector3(0.725,0.15,-1.1515)
+position = Vector3(0.783209,0.15,-1.333225)
 [node name="WheelRL" type="Marker3D" parent="WheelAnchors"]
-position = Vector3(-0.725,0.15,1.2985)
+position = Vector3(-0.783209,0.15,1.333225)
 [node name="WheelRR" type="Marker3D" parent="WheelAnchors"]
-position = Vector3(0.725,0.15,1.2985)
+position = Vector3(0.783209,0.15,1.333225)
+
 [node name="CameraAnchors" type="Node3D" parent="."]
 [node name="ChaseAnchor" type="Marker3D" parent="CameraAnchors"]
 position = Vector3(0,1.5,5.8)
 [node name="HoodAnchor" type="Marker3D" parent="CameraAnchors"]
-position = Vector3(0,0.65,-1.45)
+position = Vector3(0,0.65,-1.55)
 [node name="BumperAnchor" type="Marker3D" parent="CameraAnchors"]
-position = Vector3(0,0.25,-2.0)
+position = Vector3(0,0.25,-2.08)
 [node name="CockpitAnchor" type="Marker3D" parent="CameraAnchors"]
-position = Vector3(-0.32,0.52,-0.4)
+position = Vector3(0.40,0.64,0.35)
 [node name="LookTarget" type="Marker3D" parent="CameraAnchors"]
 position = Vector3(0,0.45,-2.8)
+
 [node name="EffectsAnchors" type="Node3D" parent="."]
 [node name="ExhaustAnchor" type="Marker3D" parent="EffectsAnchors"]
-position=Vector3(-0.45,-0.2,2.0)
+position = Vector3(-0.45,-0.2,2.08)
 [node name="TireFL" type="Marker3D" parent="EffectsAnchors"]
+position = Vector3(-0.783209,-0.05,-1.333225)
 [node name="TireFR" type="Marker3D" parent="EffectsAnchors"]
+position = Vector3(0.783209,-0.05,-1.333225)
 [node name="TireRL" type="Marker3D" parent="EffectsAnchors"]
+position = Vector3(-0.783209,-0.05,1.333225)
 [node name="TireRR" type="Marker3D" parent="EffectsAnchors"]
+position = Vector3(0.783209,-0.05,1.333225)
+
 [node name="DebugRoot" type="Node3D" parent="."]
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("2")
@@ -83,3 +120,4 @@ current = true
 [node name="WheelVisualController" type="Node" parent="."]
 script = ExtResource("3")
 vehicle_path = NodePath("..")
+visual_rig_path = NodePath("../VisualRoot/VehicleVisualRig")
