@@ -2,7 +2,7 @@
   "asset_id": "vehicle.prototype_rwd_coupe",
   "selected_source": "user-provided 350z.zip",
   "license_status": "unverified_for_release",
-  "repository_binary_policy": "source archive and blend files are not committed",
+  "repository_binary_policy": "source archive, blend files, and derived GLBs remain untracked until release-safe provenance is confirmed",
   "archive": {
     "filename": "350z.zip",
     "sha256": "7cd3cdf04c1e76996fe30260257e83f8438b3990f5c7eb21e653e2ec1c98eea9",
@@ -20,12 +20,19 @@
     "size_bytes": 146179233,
     "role": "baking and visual reference only; never direct runtime export"
   },
+  "toolchain": {
+    "blender_version": "5.2.0 LTS",
+    "blender_archive_sha256": "96f6c181a30f4950607839dc84d42a354b250d8a0231b098b59b7bc69c351c48",
+    "godot_version": "4.7.1.stable.official.a13da4feb",
+    "generator": "tools/vehicle/prepare_350z.py",
+    "generator_sha256": "579768658b57e65b5a344295a3ae82fe70cb3b1b5f8571e4081d4fd506f4a95e"
+  },
   "runtime_budget": {
     "lod0_triangles_min": 150000,
     "lod0_triangles_max": 250000,
     "lod1_max_fraction_of_lod0": 0.55,
     "lod2_max_fraction_of_lod0": 0.25,
-    "lod3_max_fraction_of_lod0": 0.10,
+    "lod3_max_fraction_of_lod0": 0.1,
     "material_count_min": 8,
     "material_count_max": 14,
     "required_lod_count": 4,
@@ -42,5 +49,10 @@
     "glass",
     "lights",
     "cockpit"
-  ]
+  ],
+  "runtime_generation": {
+    "deterministic_repeat_match": true,
+    "godot_4_7_1_import_verified": true,
+    "audit_path": "assets/source/vehicle/prototype_rwd_coupe/runtime_audit.json"
+  }
 }

@@ -20,34 +20,38 @@
 - Visual wheel steering/suspension/spin and cockpit steering-wheel hook.
 - Live telemetry overlay and versioned JSON/JSONL/CSV telemetry recorder with vehicle-definition SHA-256 provenance.
 - Measured Vehicle Lab covering straights, dry/wet braking, skidpads, slalom, handling loop, bump course, gradients, side slope, loose surfaces, jump/landing, recovery and visual inspection.
-- 350Z source fingerprint policy and deterministic Blender preparation entrypoint.
+- Deterministic Blender 5.2.0 starter-car pipeline with four production LODs and 14 runtime material families.
 
-## Measured Linux headless recovery baseline
-
-The current greybox tune is not the final subjective handling tune, but it is physically bounded and useful for regression testing:
+## Measured Linux headless baseline
 
 - 0–100 km/h: approximately 7.48 s.
-- 100–0 km/h: approximately 41.56 m after a natural acceleration run so wheel RPM and driveline state are consistent.
+- 100–0 km/h: approximately 41.56 m after a natural acceleration run.
 - independent 60 Hz five-second launch: 20.084654 m/s.
 - independent 120 Hz five-second launch: 20.942167 m/s.
 - relative 60/120 difference: approximately 4.09%, below the 12% hard gate.
 - normal flat-road ride: four wheel contacts retained and no spurious chassis-impact damage.
 
+## Starter-car asset pipeline result
+
+Blender 5.2.0 LTS processed the selected `350z.blend` working master twice with byte-identical output hashes.
+
+- LOD0: 247,186 triangles.
+- LOD1: 128,355 triangles.
+- LOD2: 49,414 triangles.
+- LOD3: 18,592 triangles.
+- runtime materials: 14.
+- independent FL/FR/RL/RR wheel pivots and a separate steering-wheel node.
+- glTF-safe transparent window and light-lens materials.
+- all four GLBs import successfully in Godot 4.7.1.
+
+Derived model binaries remain intentionally untracked while source licensing is `unverified_for_release`. The generator, source fingerprints and exact output hashes are committed so the assets can be reproduced deterministically.
+
 ## Verification policy
 
-The shared manifest contains the original 12 Phase 0 contracts plus all Phase 1 contracts. Windows and Linux wrappers reject:
+The shared manifest contains the original 12 Phase 0 contracts plus all Phase 1 contracts. Windows and Linux wrappers reject non-zero Godot exits, GDScript script errors, failed assertions, leaked objects/resources, and a 60/120 Hz speed difference above 12%.
 
-- non-zero Godot exits;
-- GDScript `SCRIPT ERROR` output;
-- explicit `ERROR: FAIL` assertions;
-- leaked Godot objects/resources;
-- a 60/120 Hz speed difference above 12%.
+## Remaining checkpoints
 
-## Remaining non-code checkpoints
-
-- Install Blender in an asset-processing environment and run `tools/vehicle/prepare_350z.py` on the user-provided working source.
-- Consolidate the 44 source materials to 8–14 production material families without losing cockpit/exterior quality.
-- Produce and inspect LOD0–LOD3 GLBs; the high-detail modifier source remains bake/reference only.
-- Replace/rebuild missing author-machine texture dependencies.
-- Verify release-safe licensing or replace/fictionalize the source before any public/commercial distribution.
+- Verify release-safe licensing or replace/fictionalize the source before public/commercial distribution.
 - Perform subjective keyboard/controller handling tuning on physical Windows/Linux hardware and record telemetry runs.
+- Run native GPU visual/performance review with the generated LOD0–LOD3 assets on target-class hardware.
