@@ -8,6 +8,7 @@ var profile: InputProfile = InputProfileType.new()
 var _steering := 0.0
 var _throttle := 0.0
 var _brake := 0.0
+var _clutch := 0.0
 
 
 func _init() -> void:
@@ -19,6 +20,7 @@ func _physics_process(delta: float) -> void:
 	var throttle_pressed := Input.is_action_pressed("drive_throttle")
 	var brake_pressed := Input.is_action_pressed("drive_brake")
 	sample_keyboard(delta, steer_axis, throttle_pressed, brake_pressed)
+	_clutch = 1.0 if Input.is_action_pressed("drive_clutch") else 0.0
 
 
 func sample_keyboard(
@@ -57,6 +59,14 @@ func get_brake() -> float:
 	return _brake
 
 
+func get_clutch() -> float:
+	return _clutch
+
+
+func get_handbrake() -> float:
+	return 1.0 if Input.is_action_pressed("drive_handbrake") else 0.0
+
+
 func shift_up_pressed() -> bool:
 	return Input.is_action_just_pressed("drive_shift_up")
 
@@ -65,11 +75,16 @@ func shift_down_pressed() -> bool:
 	return Input.is_action_just_pressed("drive_shift_down")
 
 
+func reset_pressed() -> bool:
+	return Input.is_action_just_pressed("drive_reset")
+
+
 func _ensure_input_actions() -> void:
 	_add_key_action(&"drive_steer_left", KEY_A)
 	_add_key_action(&"drive_steer_right", KEY_D)
 	_add_key_action(&"drive_throttle", KEY_W)
 	_add_key_action(&"drive_brake", KEY_S)
+	_add_key_action(&"drive_clutch", KEY_X)
 	_add_key_action(&"drive_handbrake", KEY_SPACE)
 	_add_key_action(&"drive_shift_up", KEY_E)
 	_add_key_action(&"drive_shift_down", KEY_Q)

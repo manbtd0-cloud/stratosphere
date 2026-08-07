@@ -1,0 +1,46 @@
+{
+  "asset_id": "vehicle.prototype_rwd_coupe",
+  "selected_source": "user-provided 350z.zip",
+  "license_status": "unverified_for_release",
+  "repository_binary_policy": "source archive and blend files are not committed",
+  "archive": {
+    "filename": "350z.zip",
+    "sha256": "7cd3cdf04c1e76996fe30260257e83f8438b3990f5c7eb21e653e2ec1c98eea9",
+    "size_bytes": 252547942
+  },
+  "working_master": {
+    "archive_path": "350z/350z.blend",
+    "sha256": "cdfd3bb6c7ddb67ad9cbef08e1ebad0234a67ef83f7570a7b657a135200c4ed7",
+    "size_bytes": 20873124,
+    "role": "runtime-authoring master"
+  },
+  "high_detail_reference": {
+    "archive_path": "350z/350zModifiers.blend",
+    "sha256": "8bf833e1b25ac24e001f18bc459ececd900a2f877559cffcd72fba37bbc373c7",
+    "size_bytes": 146179233,
+    "role": "baking and visual reference only; never direct runtime export"
+  },
+  "runtime_budget": {
+    "lod0_triangles_min": 150000,
+    "lod0_triangles_max": 250000,
+    "lod1_max_fraction_of_lod0": 0.55,
+    "lod2_max_fraction_of_lod0": 0.25,
+    "lod3_max_fraction_of_lod0": 0.10,
+    "material_count_min": 8,
+    "material_count_max": 14,
+    "required_lod_count": 4,
+    "forward_axis": "-Z",
+    "up_axis": "+Y"
+  },
+  "required_separable_parts": [
+    "front_left_wheel",
+    "front_right_wheel",
+    "rear_left_wheel",
+    "rear_right_wheel",
+    "steering_wheel",
+    "brakes",
+    "glass",
+    "lights",
+    "cockpit"
+  ]
+}

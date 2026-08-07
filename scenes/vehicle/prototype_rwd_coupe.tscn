@@ -1,0 +1,85 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/vehicle/physics/vehicle_controller.gd" id="1"]
+[ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_camera_rig.gd" id="2"]
+[ext_resource type="Script" path="res://src/vehicle/presentation/wheel_visual_controller.gd" id="3"]
+[sub_resource type="BoxShape3D" id="chassis"]
+size = Vector3(1.65, 0.28, 3.75)
+[sub_resource type="BoxMesh" id="bodymesh"]
+size = Vector3(1.75, 0.55, 4.05)
+[sub_resource type="CylinderMesh" id="wheelmesh"]
+top_radius = 0.306
+bottom_radius = 0.306
+height = 0.205
+radial_segments = 16
+
+[node name="VehicleController" type="RigidBody3D"]
+script = ExtResource("1")
+mass = 1180.0
+continuous_cd = true
+
+[node name="ChassisCollision" type="CollisionShape3D" parent="."]
+position = Vector3(0, -0.12, 0)
+shape = SubResource("chassis")
+[node name="VisualRoot" type="Node3D" parent="."]
+[node name="BodyExterior" type="MeshInstance3D" parent="VisualRoot"]
+position = Vector3(0,0.15,0)
+mesh = SubResource("bodymesh")
+[node name="BodyInterior" type="Node3D" parent="VisualRoot"]
+[node name="Glass" type="Node3D" parent="VisualRoot"]
+[node name="Lights" type="Node3D" parent="VisualRoot"]
+[node name="WheelVisualFL" type="MeshInstance3D" parent="VisualRoot"]
+position = Vector3(-0.725,-0.32,-1.1515)
+rotation = Vector3(0,0,1.5707963)
+mesh = SubResource("wheelmesh")
+[node name="WheelVisualFR" type="MeshInstance3D" parent="VisualRoot"]
+position = Vector3(0.725,-0.32,-1.1515)
+rotation = Vector3(0,0,1.5707963)
+mesh = SubResource("wheelmesh")
+[node name="WheelVisualRL" type="MeshInstance3D" parent="VisualRoot"]
+position = Vector3(-0.725,-0.32,1.2985)
+rotation = Vector3(0,0,1.5707963)
+mesh = SubResource("wheelmesh")
+[node name="WheelVisualRR" type="MeshInstance3D" parent="VisualRoot"]
+position = Vector3(0.725,-0.32,1.2985)
+rotation = Vector3(0,0,1.5707963)
+mesh = SubResource("wheelmesh")
+[node name="SteeringWheelPivot" type="Node3D" parent="VisualRoot/BodyInterior"]
+position = Vector3(-0.32,0.28,-0.45)
+[node name="WheelAnchors" type="Node3D" parent="."]
+[node name="WheelFL" type="Marker3D" parent="WheelAnchors"]
+position = Vector3(-0.725,0.15,-1.1515)
+[node name="WheelFR" type="Marker3D" parent="WheelAnchors"]
+position = Vector3(0.725,0.15,-1.1515)
+[node name="WheelRL" type="Marker3D" parent="WheelAnchors"]
+position = Vector3(-0.725,0.15,1.2985)
+[node name="WheelRR" type="Marker3D" parent="WheelAnchors"]
+position = Vector3(0.725,0.15,1.2985)
+[node name="CameraAnchors" type="Node3D" parent="."]
+[node name="ChaseAnchor" type="Marker3D" parent="CameraAnchors"]
+position = Vector3(0,1.5,5.8)
+[node name="HoodAnchor" type="Marker3D" parent="CameraAnchors"]
+position = Vector3(0,0.65,-1.45)
+[node name="BumperAnchor" type="Marker3D" parent="CameraAnchors"]
+position = Vector3(0,0.25,-2.0)
+[node name="CockpitAnchor" type="Marker3D" parent="CameraAnchors"]
+position = Vector3(-0.32,0.52,-0.4)
+[node name="LookTarget" type="Marker3D" parent="CameraAnchors"]
+position = Vector3(0,0.45,-2.8)
+[node name="EffectsAnchors" type="Node3D" parent="."]
+[node name="ExhaustAnchor" type="Marker3D" parent="EffectsAnchors"]
+position=Vector3(-0.45,-0.2,2.0)
+[node name="TireFL" type="Marker3D" parent="EffectsAnchors"]
+[node name="TireFR" type="Marker3D" parent="EffectsAnchors"]
+[node name="TireRL" type="Marker3D" parent="EffectsAnchors"]
+[node name="TireRR" type="Marker3D" parent="EffectsAnchors"]
+[node name="DebugRoot" type="Node3D" parent="."]
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("2")
+target_path = NodePath("..")
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+
+[node name="WheelVisualController" type="Node" parent="."]
+script = ExtResource("3")
+vehicle_path = NodePath("..")

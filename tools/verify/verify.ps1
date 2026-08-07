@@ -17,15 +17,10 @@ function Resolve-GodotExecutable {
         "godot4",
         "godot"
     ) | Where-Object { $_ -and $_.Trim().Length -gt 0 }
-
     foreach ($candidate in $candidates) {
-        if (Test-Path $candidate) {
-            return (Resolve-Path $candidate).Path
-        }
+        if (Test-Path $candidate) { return (Resolve-Path $candidate).Path }
         $command = Get-Command $candidate -ErrorAction SilentlyContinue
-        if ($command) {
-            return $command.Source
-        }
+        if ($command) { return $command.Source }
     }
     throw "Godot was not found. Set GODOT_BIN or GODOT, or install Godot 4.7.x."
 }
@@ -37,45 +32,63 @@ function Invoke-GodotChecked {
         [Parameter(Mandatory = $true)][string]$Label,
         [Parameter(Mandatory = $true)][string[]]$Arguments
     )
-
     $Output = & $Godot @Arguments 2>&1
     $ExitCode = $LASTEXITCODE
     $Output | ForEach-Object { Write-Host $_ }
-    if ($ExitCode -ne 0) {
-        throw "$Label failed with exit code $ExitCode."
+    if ($ExitCode -ne 0) { throw "$Label failed with exit code $ExitCode." }
+    $FailurePattern = 'SCRIPT ERROR|ERROR: FAIL|ObjectDB instances were leaked|resources? still in use at exit'
+    if (($Output | Out-String) -match $FailurePattern) {
+        throw "$Label reported a script error, failed assertion, or leaked Godot object/resource."
     }
-    $LeakPattern = 'ObjectDB instances were leaked|resources? still in use at exit'
-    if (($Output | Out-String) -match $LeakPattern) {
-        throw "$Label reported leaked Godot objects or resources."
-    }
+    return $Output
 }
+
+function Invoke-TickProbe {
+    param([Parameter(Mandatory = $true)][int]$Ticks)
+    $Output = Invoke-GodotChecked -Label "Tick-rate probe $Ticks Hz" -Arguments @(
+        "--headless", "--fixed-fps", "$Ticks", "--path", $ProjectRoot,
+        "--script", "res://tests/phase1/test_41_tick_rate_probe.gd", "--", "--ticks=$Ticks"
+    )
+    $Text = ($Output | Out-String)
+    $Match = [regex]::Match($Text, "TICK_RESULT ticks=$Ticks speed=([0-9.]+)")
+    if (-not $Match.Success) { throw "Tick-rate probe $Ticks Hz did not report speed." }
+    return [double]$Match.Groups[1].Value
+}
+
 Write-Host "Using Godot: $Godot"
 Write-Host "Project root: $ProjectRoot"
-
 Write-Host "==> Import project"
 Invoke-GodotChecked -Label "Godot project import" -Arguments @(
     "--headless", "--path", $ProjectRoot, "--editor", "--quit"
-)
+) | Out-Null
 
 $Tests = Get-Content $Manifest |
     ForEach-Object { $_.Trim() } |
     Where-Object { $_ -and -not $_.StartsWith("#") }
-
 foreach ($TestPath in $Tests) {
     Write-Host "==> Run $TestPath"
     Invoke-GodotChecked -Label "Test $TestPath" -Arguments @(
-        "--headless", "--path", $ProjectRoot, "--script", $TestPath
-    )
+        "--headless", "--fixed-fps", "120", "--path", $ProjectRoot, "--script", $TestPath
+    ) | Out-Null
 }
+
+Write-Host "==> Cross-process physics tick-rate matrix"
+$Speed60 = Invoke-TickProbe -Ticks 60
+$Speed120 = Invoke-TickProbe -Ticks 120
+$Denominator = [Math]::Max([Math]::Max([Math]::Abs($Speed60), [Math]::Abs($Speed120)), 1e-9)
+$RelativeDifference = [Math]::Abs($Speed60 - $Speed120) / $Denominator
+if ($RelativeDifference -gt 0.12) {
+    throw ("Tick-rate relative speed difference {0:P2} exceeds 12%." -f $RelativeDifference)
+}
+Write-Host ("PASS: 60/120 Hz relative speed difference = {0:P2}" -f $RelativeDifference)
 
 if ($Benchmark) {
     Write-Host "==> Run non-authoritative benchmark contract"
     Invoke-GodotChecked -Label "Benchmark contract" -Arguments @(
-        "--headless", "--path", $ProjectRoot,
+        "--headless", "--fixed-fps", "120", "--path", $ProjectRoot,
         "--script", "res://tools/benchmark/run_benchmark.gd", "--",
-        "--duration=1.0", "--profile=medium",
-        "--output=user://reports/benchmark/latest.json"
-    )
+        "--duration=1.0", "--profile=medium", "--output=user://reports/benchmark/latest.json"
+    ) | Out-Null
 }
 
-Write-Host "PASS: repository verification ($($Tests.Count) tests)"
+Write-Host "PASS: repository verification ($($Tests.Count) tests + physics tick matrix)"
