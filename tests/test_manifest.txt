@@ -56,3 +56,5 @@ res://tests/phase1/test_43_350z_visual_binding.gd
 res://tests/phase1/test_44_controller_input.gd
 res://tests/phase1/test_45_camera_input.gd
 res://tests/phase1/test_46_auto_lod.gd
+res://tests/phase1/test_47_lab_presentation.gd
+res://tests/phase1/test_48_telemetry_hud.gd

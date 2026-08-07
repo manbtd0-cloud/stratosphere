@@ -10,8 +10,9 @@
 - Custom four-wheel Jolt chassis with three contact rays per wheel, suspension, anti-roll, combined-slip tires, relaxation and typed surfaces.
 - Engine, clutch, six-speed transmission, neutral/reverse, LSD, ABS, time-based TCS, stability control, counter-steer, handbrake, damage and recovery.
 - Chase, hood, bumper and cockpit cameras; keyboard and controller driving; player-facing camera cycling.
-- Live telemetry overlay plus versioned JSON/JSONL/CSV recording.
+- Live telemetry recording plus a structured Vehicle Lab instrument HUD with speed, gear, RPM, assists, damage and four-wheel slip/load/surface readouts.
 - Measured Vehicle Lab covering straight-line, braking, skidpad, slalom, bumps, gradients, loose surfaces and recovery.
+- Vehicle Lab presentation layer with distinct dry/wet/gravel/dirt/grass materials, deterministic environment/sun, distance/braking markers, slalom cones and a dedicated key/fill-lit visual studio while preserving the original physics surface IDs and collision geometry.
 - Audited 350Z runtime hierarchy with real wheel/cockpit animation, greybox fallback and automatic LOD selection at 14/32/65 m with 2.5 m hysteresis.
 - Deterministic Blender 5.2.0 runtime pipeline with four LODs, 14 PBR material families and embedded tire/carbon/decal texture detail.
 
@@ -43,13 +44,13 @@ Derived GLBs remain intentionally untracked while source licensing is `unverifie
 
 ## Verification policy
 
-The shared manifest contains 58 contracts: 12 Phase 0 plus 46 Phase 1. The strengthened 350Z source contract now also requires matching geometry/material generator fingerprints and an audited embedded texture payload.
+The shared manifest contains 60 contracts: 12 Phase 0 plus 48 Phase 1. The strengthened 350Z source contract requires matching geometry/material generator fingerprints and an audited embedded texture payload.
 
-Focused Godot 4.7.1 verification on the exact textured GLBs passed source metadata, runtime LOD loading/switching, semantic wheel mapping, real wheel/cockpit animation, greybox fallback, controller input, camera input, automatic LOD and the existing keyboard-input regression. A direct GLB parser also passed the embedded texture contract.
+Focused Godot 4.7.1 verification on the exact textured GLBs passed source metadata, runtime LOD loading/switching, semantic wheel mapping, real wheel/cockpit animation, greybox fallback, controller input, camera input, automatic LOD and keyboard-input regression. The new lab-presentation contract verifies explicit surface materials, deterministic lighting, measurement markers, visual-studio lighting, preserved physics surface IDs and preserved colliders. The telemetry-HUD contract verifies the structured speed/gear/RPM/assist and wheel readouts from a real telemetry snapshot.
 
 ## Remaining checkpoints
 
-- Run the complete shared 58-contract repository gate on a fully reconstructed exact branch tree before Phase 1 closure.
+- Run the complete shared 60-contract repository gate on a fully reconstructed exact branch tree before Phase 1 closure.
 - Perform subjective keyboard/controller handling tuning on physical Windows/Linux hardware and record telemetry runs.
 - Run native GPU visual/performance review with the generated LOD0-L3 assets on target-class hardware.
 - Verify release-safe licensing or replace/fictionalize the source before public/commercial distribution.
