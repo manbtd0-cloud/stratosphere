@@ -58,3 +58,7 @@ res://tests/phase1/test_45_camera_input.gd
 res://tests/phase1/test_46_auto_lod.gd
 res://tests/phase1/test_47_lab_presentation.gd
 res://tests/phase1/test_48_telemetry_hud.gd
+res://tests/phase1/test_49_presentation_bridges.gd
+res://tests/phase1/test_50_brake_light_binding.gd
+res://tests/phase1/test_51_presentation_bridge_scene.gd
+res://tests/phase1/test_52_vehicle_asset_validator.gd

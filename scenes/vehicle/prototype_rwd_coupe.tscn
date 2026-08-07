@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://src/vehicle/physics/vehicle_controller.gd" id="1"]
 [ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_camera_rig.gd" id="2"]
@@ -6,6 +6,8 @@
 [ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_visual_rig.gd" id="4"]
 [ext_resource type="Script" path="res://src/vehicle/data/body_config.gd" id="5"]
 [ext_resource type="Script" path="res://src/vehicle/data/vehicle_definition.gd" id="6"]
+[ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_audio_bridge.gd" id="7"]
+[ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_effects_bridge.gd" id="8"]
 
 [sub_resource type="Resource" id="body_config"]
 script = ExtResource("5")
@@ -119,5 +121,13 @@ current = true
 
 [node name="WheelVisualController" type="Node" parent="."]
 script = ExtResource("3")
+vehicle_path = NodePath("..")
+visual_rig_path = NodePath("../VisualRoot/VehicleVisualRig")
+[node name="AudioBridge" type="Node" parent="."]
+script = ExtResource("7")
+vehicle_path = NodePath("..")
+
+[node name="EffectsBridge" type="Node" parent="."]
+script = ExtResource("8")
 vehicle_path = NodePath("..")
 visual_rig_path = NodePath("../VisualRoot/VehicleVisualRig")
