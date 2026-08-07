@@ -17,12 +17,16 @@
 - Mechanical rear handbrake.
 - Collision-driven typed damage and repair/reset hooks.
 - Chase, hood, bumper and cockpit camera modes with chase collision avoidance.
+- Keyboard driving retains progressive steering/throttle/brake smoothing.
+- Controller driving is wired through left-stick steering, analog triggers, A handbrake, X clutch, shoulder-button shifting and Y camera cycling.
+- Camera cycling is player-facing on keyboard C and controller Y.
 - Live telemetry overlay and versioned JSON/JSONL/CSV telemetry recorder with vehicle-definition SHA-256 provenance.
 - Measured Vehicle Lab covering straights, dry/wet braking, skidpads, slalom, handling loop, bump course, gradients, side slope, loose surfaces, jump/landing, recovery and visual inspection.
 - Deterministic Blender 5.2.0 starter-car pipeline with four production LODs and 14 runtime material families.
-- Runtime 350Z visual adapter with LOD switching, semantic body/cockpit/glass/wheel bindings and an animated greybox fallback for clones without local runtime GLBs.
-- Real GLB wheel animation driven by physics telemetry: suspension delta, wheel RPM, front steering and cockpit steering-wheel motion.
-- Scene-specific wheelbase/track updated to the audited 350Z pivots while the calibrated 0.306 m effective tire radius and collision proxy remain unchanged.
+- Runtime 350Z visual adapter with semantic body/cockpit/glass/wheel bindings and an animated greybox fallback for clones without local runtime GLBs.
+- Automatic 350Z LOD selection uses 14 m / 32 m / 65 m distance thresholds, 2.5 m hysteresis and a 0.20 s check interval.
+- Real GLB wheel animation is driven by physics telemetry: suspension delta, wheel RPM, front steering and cockpit steering-wheel motion.
+- Scene-specific wheelbase/track use the audited 350Z pivots while the calibrated 0.306 m effective tire radius and collision proxy remain unchanged.
 
 ## Measured Linux headless baseline
 
@@ -46,15 +50,15 @@ Blender 5.2.0 LTS processed the selected `350z.blend` working master twice with 
 - glTF-safe transparent window and light-lens materials.
 - all four GLBs import successfully in Godot 4.7.1.
 
-The production scene expects local development GLBs at `res://assets/runtime/vehicle/prototype_rwd_coupe/`. The runtime visual rig corrects the imported model orientation by 180 degrees, applies the audited vertical presentation offset, and remaps physical wheel IDs to the rotated semantic hierarchy. LOD0 is the default hero-car presentation; LOD1-L3 can be selected through the same adapter.
+The production scene expects local development GLBs at `res://assets/runtime/vehicle/prototype_rwd_coupe/`. The runtime visual rig corrects the imported model orientation by 180 degrees, applies the audited vertical presentation offset, remaps physical wheel IDs to the rotated semantic hierarchy and automatically selects LOD from the active gameplay camera.
 
 Derived model binaries remain intentionally untracked while source licensing is `unverified_for_release`. The generator, source fingerprints and exact output hashes are committed so the assets can be reproduced deterministically. If the GLBs are absent, the scene remains functional through the animated greybox fallback.
 
 ## Verification policy
 
-The shared manifest contains the original 12 Phase 0 contracts plus all Phase 1 contracts, including the 350Z visual-binding contract. Windows and Linux wrappers reject non-zero Godot exits, GDScript script errors, failed assertions, leaked objects/resources, and a 60/120 Hz speed difference above 12%.
+The shared manifest now contains 58 contracts: the original 12 Phase 0 contracts plus 46 Phase 1 contracts. Windows and Linux wrappers reject non-zero Godot exits, GDScript script errors, failed assertions, leaked objects/resources, and a 60/120 Hz speed difference above 12%.
 
-The visual integration was additionally exercised against the real generated GLBs in Godot 4.7.1. Contracts covered runtime LOD loading/switching, semantic wheel remapping, suspension/steering/spin animation, cockpit steering animation, production-scene binding and the no-asset fallback path.
+Focused Godot 4.7.1 verification additionally exercised the real generated GLBs and covered runtime LOD loading/switching, semantic wheel remapping, suspension/steering/spin animation, cockpit steering animation, animated greybox fallback, controller action bindings, analog input shaping, keyboard-input regression and player camera cycling.
 
 ## Remaining checkpoints
 

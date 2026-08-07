@@ -11,6 +11,7 @@ func _ready()->void:
 func cycle()->void:mode_index=(mode_index+1)%modes.size()
 func current_mode()->StringName:return StringName(modes[mode_index])
 func _physics_process(delta:float)->void:
+	if Input.is_action_just_pressed("camera_next"):cycle()
 	if target==null or camera==null:return
 	var anchor_name={"chase":"ChaseAnchor","hood":"HoodAnchor","bumper":"BumperAnchor","cockpit":"CockpitAnchor"}.get(modes[mode_index],"ChaseAnchor")
 	var anchor=target.get_node_or_null("CameraAnchors/%s"%anchor_name) as Node3D

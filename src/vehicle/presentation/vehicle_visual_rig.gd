@@ -15,13 +15,51 @@ const PHYSICAL_WHEEL_SEMANTICS := {
 @export var model_yaw_degrees := 180.0
 @export var model_vertical_offset := -0.39
 @export var fallback_path: NodePath
+@export var auto_lod_enabled := true
+@export var lod_distances := PackedFloat32Array([14.0, 32.0, 65.0])
+@export var lod_hysteresis := 2.5
+@export_range(0.05, 1.0, 0.05) var lod_check_interval := 0.20
 
 var _active_lod := -1
 var _model_root: Node3D
 var _semantic_nodes: Dictionary = {}
+var _lod_check_elapsed := 0.0
 
 func _ready() -> void:
     set_lod(initial_lod)
+
+func _process(delta: float) -> void:
+    if not auto_lod_enabled:
+        return
+    _lod_check_elapsed += delta
+    if _lod_check_elapsed < lod_check_interval:
+        return
+    _lod_check_elapsed = 0.0
+    var camera := get_viewport().get_camera_3d()
+    if camera == null:
+        return
+    var current := _active_lod if _active_lod >= 0 else initial_lod
+    var recommended := recommended_lod_for_distance(global_position.distance_to(camera.global_position), current)
+    if recommended != _active_lod:
+        set_lod(recommended)
+
+func recommended_lod_for_distance(distance_m: float, current_lod: int = -1) -> int:
+    if lod_distances.size() < 3:
+        return clampi(current_lod if current_lod >= 0 else 0, 0, 3)
+    if current_lod < 0:
+        if distance_m < lod_distances[0]:
+            return 0
+        if distance_m < lod_distances[1]:
+            return 1
+        if distance_m < lod_distances[2]:
+            return 2
+        return 3
+    var lod := clampi(current_lod, 0, 3)
+    while lod < 3 and distance_m > lod_distances[lod] + lod_hysteresis:
+        lod += 1
+    while lod > 0 and distance_m < lod_distances[lod - 1] - lod_hysteresis:
+        lod -= 1
+    return lod
 
 func runtime_path(lod_index: int) -> String:
     return "%s/prototype_rwd_coupe_lod%d.glb" % [runtime_root.trim_suffix("/"), clampi(lod_index, 0, 3)]
