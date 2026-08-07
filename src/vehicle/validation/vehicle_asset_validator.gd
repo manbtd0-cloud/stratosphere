@@ -13,7 +13,6 @@ static func validate_metadata(manifest: Dictionary, audit: Dictionary) -> Packed
         errors.append("asset_id must be present")
     if not bool(audit.get("deterministic_repeat_match", false)):
         errors.append("runtime generation must be deterministic across repeated runs")
-
     var budget: Dictionary = manifest.get("runtime_budget", {})
     var lods: Dictionary = audit.get("lods", {})
     var required_lods := int(budget.get("required_lod_count", 0))
@@ -21,42 +20,35 @@ static func validate_metadata(manifest: Dictionary, audit: Dictionary) -> Packed
         errors.append("runtime budget must define a positive required_lod_count")
     elif lods.size() < required_lods:
         errors.append("runtime audit contains fewer LODs than required")
-
     var lod0: Dictionary = lods.get("lod0", {})
     var lod0_triangles := int(lod0.get("triangles", 0))
     var lod0_min := int(budget.get("lod0_triangles_min", 0))
     var lod0_max := int(budget.get("lod0_triangles_max", 0))
     if lod0_triangles < lod0_min or lod0_triangles > lod0_max:
         errors.append("LOD0 triangles are outside the configured hero-car budget")
-
     _validate_fraction(errors, lods, "lod1", float(budget.get("lod1_max_fraction_of_lod0", 1.0)))
     _validate_fraction(errors, lods, "lod2", float(budget.get("lod2_max_fraction_of_lod0", 1.0)))
     _validate_fraction(errors, lods, "lod3", float(budget.get("lod3_max_fraction_of_lod0", 1.0)))
-
     var material_count := int(audit.get("runtime_material_count", 0))
     var material_min := int(budget.get("material_count_min", 0))
     var material_max := int(budget.get("material_count_max", 2147483647))
     if material_count < material_min or material_count > material_max:
         errors.append("runtime material count is outside the configured budget")
-
     var runtime_generation: Dictionary = manifest.get("runtime_generation", {})
     if bool(runtime_generation.get("embedded_texture_payload_required", false)):
         var payload: Dictionary = audit.get("texture_payload", {})
         var minimum_images := int(runtime_generation.get("minimum_embedded_images", 1))
         if int(payload.get("images", 0)) < minimum_images or int(payload.get("textures", 0)) < minimum_images:
             errors.append("required embedded texture payload is incomplete")
-
     var import_audit: Dictionary = audit.get("godot_4_7_1_import", {})
     if not bool(import_audit.get("verified", false)):
         errors.append("Godot runtime import has not been verified")
     if not bool(import_audit.get("all_semantic_nodes_present", false)):
         errors.append("runtime semantic-node audit is incomplete")
-
     var semantic_nodes: Array = audit.get("semantic_nodes", [])
     for required in ["body_exterior", "cockpit_static", "glass_static", "steering_wheel_visual", "wheel_fl_visual", "wheel_fr_visual", "wheel_rl_visual", "wheel_rr_visual"]:
         if required not in semantic_nodes:
             errors.append("missing required semantic node: %s" % required)
-
     var wheel_centers: Dictionary = audit.get("wheel_centers_blender", {})
     for id in ["fl", "fr", "rl", "rr"]:
         if not wheel_centers.has(id):
@@ -84,7 +76,7 @@ static func validate_scene_contract(vehicle: Node) -> PackedStringArray:
         "WheelAnchors/WheelFL", "WheelAnchors/WheelFR", "WheelAnchors/WheelRL", "WheelAnchors/WheelRR",
         "CameraAnchors/ChaseAnchor", "CameraAnchors/HoodAnchor", "CameraAnchors/BumperAnchor", "CameraAnchors/CockpitAnchor", "CameraAnchors/LookTarget",
         "EffectsAnchors/ExhaustAnchor", "EffectsAnchors/TireFL", "EffectsAnchors/TireFR", "EffectsAnchors/TireRL", "EffectsAnchors/TireRR",
-        "VisualRoot/VehicleVisualRig", "AudioBridge", "EffectsBridge"
+        "VisualRoot/VehicleVisualRig", "AudioBridge", "EffectsBridge", "TelemetryEnricher", "RecoveryCoordinator"
     ]:
         if vehicle.get_node_or_null(path) == null:
             errors.append("vehicle scene missing required production node: %s" % path)

@@ -17,6 +17,8 @@
 - Telemetry-only audio/effects bridges expose RPM/load/gear/surface/slip/impact/exhaust/skid/damage state without coupling presentation back into physics.
 - Runtime brake-light emission follows brake telemetry on the real `runtime_light_red` material and automatically rebinds after LOD replacement.
 - Reusable `VehicleAssetValidator` enforces LOD/material/texture/import/semantic/scene contracts for future cars and keeps release licensing as a separate explicit gate.
+- `VehicleTelemetryEnricher` derives suspension velocity and surface wetness per wheel plus frame/physics cadence and enrichment cost without modifying the vehicle force path.
+- `VehicleRecoveryCoordinator` maintains a last-known-safe upright/grounded reset transform and provides delayed automatic recovery only for settled inverted vehicles.
 
 ## Measured Linux headless baseline
 
@@ -45,13 +47,13 @@ Derived GLBs remain intentionally untracked while source licensing is `unverifie
 
 ## Verification policy
 
-The shared manifest contains 64 contracts: 12 Phase 0 plus 52 Phase 1. The 350Z source contract requires matching geometry/material generator fingerprints and an audited embedded texture payload.
+The shared manifest contains 67 contracts: 12 Phase 0 plus 55 Phase 1. The 350Z source contract requires matching geometry/material generator fingerprints and an audited embedded texture payload.
 
-Focused Godot 4.7.1 verification on the exact textured runtime package passed contracts 42–52 together: source metadata, runtime visual binding, controller input, camera input, automatic LOD, lab presentation, telemetry HUD, presentation bridge state, real brake-light rebinding, production bridge scene integration and reusable asset validation.
+Focused Godot 4.7.1 verification on the exact textured runtime package passed contracts 42–55 together (14/14): source metadata, runtime visual binding, controller input, camera input, automatic LOD, lab presentation, telemetry HUD, presentation bridge state, real brake-light rebinding, production bridge scene integration, reusable asset validation, telemetry enrichment, recovery decision logic and production service-node integration.
 
 ## Remaining checkpoints
 
-- Run the complete shared 64-contract repository gate on a fully reconstructed exact branch tree before Phase 1 closure.
+- Run the complete shared 67-contract repository gate on a fully reconstructed exact branch tree before Phase 1 closure.
 - Perform subjective keyboard/controller handling tuning on physical Windows/Linux hardware and record telemetry runs.
 - Run native GPU visual/performance review with the generated LOD0-L3 assets on target-class hardware.
 - Verify release-safe licensing or replace/fictionalize the source before public/commercial distribution.

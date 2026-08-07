@@ -62,3 +62,6 @@ res://tests/phase1/test_49_presentation_bridges.gd
 res://tests/phase1/test_50_brake_light_binding.gd
 res://tests/phase1/test_51_presentation_bridge_scene.gd
 res://tests/phase1/test_52_vehicle_asset_validator.gd
+res://tests/phase1/test_53_telemetry_enrichment.gd
+res://tests/phase1/test_54_recovery_coordinator.gd
+res://tests/phase1/test_55_vehicle_services_scene.gd

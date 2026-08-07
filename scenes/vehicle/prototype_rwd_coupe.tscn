@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://src/vehicle/physics/vehicle_controller.gd" id="1"]
 [ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_camera_rig.gd" id="2"]
@@ -8,6 +8,8 @@
 [ext_resource type="Script" path="res://src/vehicle/data/vehicle_definition.gd" id="6"]
 [ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_audio_bridge.gd" id="7"]
 [ext_resource type="Script" path="res://src/vehicle/presentation/vehicle_effects_bridge.gd" id="8"]
+[ext_resource type="Script" path="res://src/vehicle/telemetry/vehicle_telemetry_enricher.gd" id="9"]
+[ext_resource type="Script" path="res://src/vehicle/recovery/vehicle_recovery_coordinator.gd" id="10"]
 
 [sub_resource type="Resource" id="body_config"]
 script = ExtResource("5")
@@ -131,3 +133,11 @@ vehicle_path = NodePath("..")
 script = ExtResource("8")
 vehicle_path = NodePath("..")
 visual_rig_path = NodePath("../VisualRoot/VehicleVisualRig")
+
+[node name="TelemetryEnricher" type="Node" parent="."]
+script = ExtResource("9")
+vehicle_path = NodePath("..")
+
+[node name="RecoveryCoordinator" type="Node" parent="."]
+script = ExtResource("10")
+vehicle_path = NodePath("..")
