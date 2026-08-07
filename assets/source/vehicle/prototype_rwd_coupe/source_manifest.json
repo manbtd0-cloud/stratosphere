@@ -24,8 +24,10 @@
     "blender_version": "5.2.0 LTS",
     "blender_archive_sha256": "96f6c181a30f4950607839dc84d42a354b250d8a0231b098b59b7bc69c351c48",
     "godot_version": "4.7.1.stable.official.a13da4feb",
-    "generator": "tools/vehicle/prepare_350z.py",
-    "generator_sha256": "579768658b57e65b5a344295a3ae82fe70cb3b1b5f8571e4081d4fd506f4a95e"
+    "geometry_generator": "tools/vehicle/prepare_350z.py",
+    "geometry_generator_sha256": "579768658b57e65b5a344295a3ae82fe70cb3b1b5f8571e4081d4fd506f4a95e",
+    "material_entrypoint": "tools/vehicle/prepare_350z_textured.py",
+    "material_entrypoint_sha256": "b7c975b1fdc24766287f9a380cd39e7cf0590fd2751188547fdb755523597f8e"
   },
   "runtime_budget": {
     "lod0_triangles_min": 150000,
@@ -53,6 +55,8 @@
   "runtime_generation": {
     "deterministic_repeat_match": true,
     "godot_4_7_1_import_verified": true,
+    "embedded_texture_payload_required": true,
+    "minimum_embedded_images": 4,
     "audit_path": "assets/source/vehicle/prototype_rwd_coupe/runtime_audit.json"
   }
 }

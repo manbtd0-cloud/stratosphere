@@ -13,40 +13,40 @@ User-provided `350z.zip`:
 - working source: `350z/350z.blend`, SHA-256 `cdfd3bb6c7ddb67ad9cbef08e1ebad0234a67ef83f7570a7b657a135200c4ed7`
 - high-detail reference: `350z/350zModifiers.blend`, SHA-256 `8bf833e1b25ac24e001f18bc459ececd900a2f877559cffcd72fba37bbc373c7`
 
-The source archive is deliberately not committed to GitHub.
+The source archive and derived model binaries are deliberately not committed while release provenance remains unverified.
 
 ## Inspection result
 
-The source is suitable for the starter car because it includes a real Blender authoring file, a detailed cockpit, and separable body/wheel/brake/interior collections rather than a single fused render mesh.
-
-Source characteristics:
-
 - `350z.blend`: ~20.9 MB, ~146k raw visible triangles and ~1.84M evaluated triangles with source subdivision.
 - `350zModifiers.blend`: ~146 MB and ~1.87M visible triangles; reference/bake source only.
-- car dimensions are about 1.98 m wide, 4.35 m long and 1.32 m high.
+- runtime dimensions: about 1.98 m wide, 4.35 m long and 1.32 m high.
 - cockpit includes dashboard, seats, center console, steering wheel and gauges.
-- several author-machine image paths are missing, but runtime material consolidation avoids depending on the broken environment-only paths.
+- audited wheel pivots support a 2.66645 m scene wheelbase and 1.56642 m track.
 
 ## Runtime preparation result
 
-Blender 5.2.0 LTS generated deterministic runtime assets twice with byte-identical SHA-256 hashes.
+Blender 5.2.0 LTS generated the textured runtime set twice with byte-identical outputs.
 
-- LOD0: 247,186 triangles, 6,330,868 bytes.
-- LOD1: 128,355 triangles, 51.93% of LOD0.
-- LOD2: 49,414 triangles, 19.99% of LOD0.
-- LOD3: 18,592 triangles, 7.52% of LOD0.
+- LOD0: 247,186 triangles, 7,976,076 bytes.
+- LOD1: 128,355 triangles, 5,123,824 bytes, 51.93% of LOD0.
+- LOD2: 49,414 triangles, 2,979,408 bytes, 19.99% of LOD0.
+- LOD3: 18,592 triangles, 2,101,008 bytes, 7.52% of LOD0.
 - runtime material families: 14.
-- semantic hierarchy: body, cockpit, glass, steering wheel and four independent wheel pivots.
-- windows use glTF `BLEND` plus `KHR_materials_transmission`; light lenses use explicit red/amber/clear runtime families.
-- Godot 4.7.1 imports all four GLBs successfully with all semantic nodes present.
+- embedded texture payload: 4 images / 4 textures.
+- tire and carbon families carry embedded normal maps.
+- the decal family carries embedded plate base-color and normal maps.
+- paint, glass, lights, metal, brake, leather and interior families use explicit glTF-safe automotive PBR values.
+- semantic hierarchy preserves body, cockpit, glass, steering wheel and four independent wheel pivots.
+- all four textured GLBs import and bind successfully in Godot 4.7.1.
 
-Exact hashes, byte sizes and wheel/pivot measurements are recorded in `assets/source/vehicle/prototype_rwd_coupe/runtime_audit.json`.
+Geometry generation remains in `tools/vehicle/prepare_350z.py`. The material/texture entrypoint is `tools/vehicle/prepare_350z_textured.py`; it overlays explicit runtime materials, validates the exported GLB payload and records texture provenance in the generated audit.
+
+Exact generator fingerprints and output hashes are recorded in `assets/source/vehicle/prototype_rwd_coupe/runtime_audit.json`.
 
 ## Production policy
 
 - `350z.blend` remains the working master.
 - `350zModifiers.blend` must never be exported directly into runtime content.
-- the deterministic generator is `tools/vehicle/prepare_350z.py`.
 - runtime axes are `-Z` forward and `+Y` up.
 - source and derived binaries remain out of GitHub while release licensing is unverified.
 - public/commercial use remains blocked until provenance is verified or the mesh is replaced/fictionalized with release-safe source material.

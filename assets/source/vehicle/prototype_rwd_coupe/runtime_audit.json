@@ -1,23 +1,102 @@
 {
   "asset_id": "vehicle.prototype_rwd_coupe",
   "generated_at_phase": "phase-1-vehicle-laboratory",
-  "generator_sha256": "579768658b57e65b5a344295a3ae82fe70cb3b1b5f8571e4081d4fd506f4a95e",
-  "blender": {"version": "5.2.0 LTS", "archive_sha256": "96f6c181a30f4950607839dc84d42a354b250d8a0231b098b59b7bc69c351c48"},
+  "generator_sha256": "b7c975b1fdc24766287f9a380cd39e7cf0590fd2751188547fdb755523597f8e",
+  "blender": {
+    "version": "5.2.0 LTS",
+    "archive_sha256": "96f6c181a30f4950607839dc84d42a354b250d8a0231b098b59b7bc69c351c48"
+  },
   "source_sha256": "cdfd3bb6c7ddb67ad9cbef08e1ebad0234a67ef83f7570a7b657a135200c4ed7",
   "deterministic_repeat_match": true,
   "runtime_material_count": 14,
-  "runtime_materials": ["runtime_brake_disc", "runtime_caliper", "runtime_carbon", "runtime_chrome", "runtime_decal", "runtime_glass", "runtime_interior_plastic", "runtime_leather", "runtime_light_amber", "runtime_light_clear", "runtime_light_red", "runtime_paint", "runtime_rim", "runtime_tire"],
-  "semantic_nodes": ["body_exterior", "cockpit_static", "glass_static", "steering_wheel_visual", "wheel_fl_visual", "wheel_fr_visual", "wheel_rl_visual", "wheel_rr_visual"],
-  "lods": {
-    "lod0": {"triangles": 247186, "fraction_of_lod0": 1.0, "size_bytes": 6330868, "sha256": "e0f0f72442e975ea09032a67ebaa26a1b13fdc1166ca00acde25bd7b23b31c55"},
-    "lod1": {"triangles": 128355, "fraction_of_lod0": 0.5192648450964051, "size_bytes": 3478596, "sha256": "e6eaa25b3cb9005811c84e875b18c0d05c057693993ac9b87745558142139c02"},
-    "lod2": {"triangles": 49414, "fraction_of_lod0": 0.19990614355181927, "size_bytes": 1468096, "sha256": "2ce0bf6ffc37c100cd25fb8c93c169ae62ce176993ac357aeb24a489d689b907"},
-    "lod3": {"triangles": 18592, "fraction_of_lod0": 0.07521461571448221, "size_bytes": 589664, "sha256": "e2a5a55c0aa4434b999d2abe406b1b5e42a21b85042e8a3c350ff0955b584014"}
+  "runtime_materials": [
+    "runtime_brake_disc",
+    "runtime_caliper",
+    "runtime_carbon",
+    "runtime_chrome",
+    "runtime_decal",
+    "runtime_glass",
+    "runtime_interior_plastic",
+    "runtime_leather",
+    "runtime_light_amber",
+    "runtime_light_clear",
+    "runtime_light_red",
+    "runtime_paint",
+    "runtime_rim",
+    "runtime_tire"
+  ],
+  "texture_payload": {
+    "images": 4,
+    "textures": 4,
+    "materials": {
+      "runtime_tire": true,
+      "runtime_carbon": true,
+      "runtime_decal": true
+    },
+    "details": {
+      "runtime_tire": "embedded normal map",
+      "runtime_carbon": "embedded normal map",
+      "runtime_decal": "embedded base-color and normal maps"
+    }
   },
-  "wheel_centers_blender": {"fl": [-0.783209, -1.332685, 0.34165], "fr": [0.783209, -1.333765, 0.342369], "rl": [-0.783209, 1.333764, 0.342369], "rr": [0.783209, 1.332685, 0.34165]},
+  "semantic_nodes": [
+    "body_exterior",
+    "cockpit_static",
+    "glass_static",
+    "steering_wheel_visual",
+    "wheel_fl_visual",
+    "wheel_fr_visual",
+    "wheel_rl_visual",
+    "wheel_rr_visual"
+  ],
+  "lods": {
+    "lod0": {
+      "triangles": 247186,
+      "fraction_of_lod0": 1.0,
+      "size_bytes": 7976076,
+      "sha256": "5b2dee074006768e535a0de961b537d7d820b32d2d2dbb4afd2ca321e0c77bea"
+    },
+    "lod1": {
+      "triangles": 128355,
+      "fraction_of_lod0": 0.5192648450964051,
+      "size_bytes": 5123824,
+      "sha256": "b547bcf5f668d625161a8cb4a801ea50d31fdc39db4422ae763cc883ed9dabe0"
+    },
+    "lod2": {
+      "triangles": 49414,
+      "fraction_of_lod0": 0.19990614355181927,
+      "size_bytes": 2979408,
+      "sha256": "ea1dbabdc38d7d26d4e0d9eaacffcd0f4b1b2081f421caa7c5a233e71268649a"
+    },
+    "lod3": {
+      "triangles": 18592,
+      "fraction_of_lod0": 0.07521461571448221,
+      "size_bytes": 2101008,
+      "sha256": "5c7e0356de04e46f31cd37b64061d45440006e509cda8055228da12991851f7d"
+    }
+  },
+  "wheel_centers_blender": {
+    "fl": [-0.783209, -1.332685, 0.34165],
+    "fr": [0.783209, -1.333765, 0.342369],
+    "rl": [-0.783209, 1.333764, 0.342369],
+    "rr": [0.783209, 1.332685, 0.34165]
+  },
   "steering_pivot_blender": [-0.387, -0.165, -0.015],
-  "axes": {"blender_forward": "-Y", "blender_up": "+Z", "runtime_forward": "-Z", "runtime_up": "+Y"},
-  "godot_4_7_1_import": {"verified": true, "lod0_mesh_instances": 134, "lod1_mesh_instances": 134, "lod2_mesh_instances": 64, "lod3_mesh_instances": 64, "runtime_bounds_lod0_m": [1.979761, 1.663504, 4.348529], "all_semantic_nodes_present": true},
+  "axes": {
+    "blender_forward": "-Y",
+    "blender_up": "+Z",
+    "runtime_forward": "-Z",
+    "runtime_up": "+Y"
+  },
+  "godot_4_7_1_import": {
+    "verified": true,
+    "lod0_mesh_instances": 134,
+    "lod1_mesh_instances": 134,
+    "lod2_mesh_instances": 64,
+    "lod3_mesh_instances": 64,
+    "runtime_bounds_lod0_m": [1.979761, 1.663504, 4.348529],
+    "all_semantic_nodes_present": true
+  },
   "godot_visual_integration": {
     "vehicle_scene": "res://scenes/vehicle/prototype_rwd_coupe.tscn",
     "runtime_root": "res://assets/runtime/vehicle/prototype_rwd_coupe",
@@ -27,10 +106,21 @@
     "scene_track_width_m": 1.56642,
     "effective_physics_wheel_radius_m": 0.306,
     "greybox_fallback_supported": true,
-    "physical_wheel_semantic_remap": {"fl": "wheel_fr_visual", "fr": "wheel_fl_visual", "rl": "wheel_rr_visual", "rr": "wheel_rl_visual"},
+    "physical_wheel_semantic_remap": {
+      "fl": "wheel_fr_visual",
+      "fr": "wheel_fl_visual",
+      "rl": "wheel_rr_visual",
+      "rr": "wheel_rl_visual"
+    },
     "wheel_spin_from_telemetry": true,
     "suspension_delta_from_telemetry": true,
-    "cockpit_steering_from_telemetry": true
+    "cockpit_steering_from_telemetry": true,
+    "automatic_lod": {
+      "enabled": true,
+      "distance_thresholds_m": [14.0, 32.0, 65.0],
+      "hysteresis_m": 2.5
+    }
   },
-  "runtime_binary_policy": "derived GLBs are intentionally not committed while source licensing remains unverified; regenerate from the fingerprinted source with Blender 5.2.0 LTS"
+  "runtime_binary_policy": "derived GLBs are intentionally not committed while source licensing remains unverified; regenerate from the fingerprinted source with Blender 5.2.0 LTS",
+  "geometry_generator_sha256": "579768658b57e65b5a344295a3ae82fe70cb3b1b5f8571e4081d4fd506f4a95e"
 }
