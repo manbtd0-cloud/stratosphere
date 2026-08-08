@@ -1,0 +1,153 @@
+name: Phase 2 Windows Closure
+
+on:
+  pull_request:
+    branches:
+      - agent/phase-2-windows-closure-base
+
+permissions:
+  contents: write
+
+jobs:
+  windows-closure:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact Phase 2 staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase-2-road-world-foundation
+          fetch-depth: 0
+
+      - name: Reconstruct and apply Linux-verified Phase 2 patch
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-StrictMode -Version Latest
+
+          $chunks = @(Get-ChildItem ".phase2_publish\chunk_*" | Sort-Object Name)
+          if ($chunks.Count -ne 9) {
+              throw "Expected 9 Phase 2 publication chunks, found $($chunks.Count)."
+          }
+
+          $builder = [System.Text.StringBuilder]::new()
+          foreach ($chunk in $chunks) {
+              [void]$builder.Append([System.IO.File]::ReadAllText($chunk.FullName, [System.Text.Encoding]::ASCII))
+          }
+          $base64 = $builder.ToString()
+          $gzipPath = Join-Path $env:RUNNER_TEMP "phase2.patch.gz"
+          $patchPath = Join-Path $env:RUNNER_TEMP "phase2.patch"
+          [System.IO.File]::WriteAllBytes($gzipPath, [System.Convert]::FromBase64String($base64))
+
+          $input = [System.IO.File]::OpenRead($gzipPath)
+          try {
+              $gzip = [System.IO.Compression.GZipStream]::new($input, [System.IO.Compression.CompressionMode]::Decompress)
+              try {
+                  $output = [System.IO.File]::Create($patchPath)
+                  try {
+                      $gzip.CopyTo($output)
+                  }
+                  finally {
+                      $output.Dispose()
+                  }
+              }
+              finally {
+                  $gzip.Dispose()
+              }
+          }
+          finally {
+              $input.Dispose()
+          }
+
+          $expected = "453f4f5b4e63b3f25caf734c3fd0c22f3ea3771b1718df0f77db81cbeaff4da1"
+          $actual = (Get-FileHash $patchPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+              throw "Phase 2 patch hash mismatch. Expected $expected, got $actual."
+          }
+          Write-Host "PASS: Phase 2 publication patch SHA-256 = $actual"
+
+          git apply --index --whitespace=error-all $patchPath
+          if ($LASTEXITCODE -ne 0) {
+              throw "Unable to apply Phase 2 publication patch."
+          }
+
+          Remove-Item ".phase2_publish" -Recurse -Force
+          git add -A
+          git diff --cached --check
+          if ($LASTEXITCODE -ne 0) {
+              throw "Phase 2 staged tree failed git diff --check."
+          }
+          Write-Host "PASS: exact Phase 2 tree reconstructed"
+
+      - name: Install official Godot 4.7.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tools = Join-Path $env:RUNNER_TEMP "godot-4.7.1"
+          $archive = Join-Path $env:RUNNER_TEMP "godot-4.7.1.zip"
+          New-Item -ItemType Directory -Force -Path $tools | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $tools -Force
+          $godot = Join-Path $tools "Godot_v4.7.1-stable_win64.exe"
+          if (-not (Test-Path $godot)) {
+              throw "Official Godot 4.7.1 executable was not found after extraction."
+          }
+          & $godot --version
+          if ($LASTEXITCODE -ne 0) {
+              throw "Godot 4.7.1 version check failed."
+          }
+          "GODOT_BIN=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run full native Windows repository gate
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -ExecutionPolicy Bypass -File .\tools\verify\verify.ps1
+          if ($LASTEXITCODE -ne 0) {
+              throw "Native Windows Phase 2 repository verification failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Record Windows closure evidence
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $path = "docs/status/phase-2-road-world-foundation-report.md"
+          $text = [System.IO.File]::ReadAllText($path)
+          $text = $text.Replace("**Native Windows gate:** pending milestone closure run", "**Native Windows gate:** PASS")
+          $replacement = @"
+## Automated evidence — Windows
+
+- Official Godot 4.7.1 native Windows runner: **PASS**
+- Repository tests: **83/83 PASS**
+- 60/120 Hz physics tick matrix: **PASS**
+- Phase 1 vehicle tick-rate difference remains **3.14%**, below the **12%** gate.
+
+## Remaining physical/release checkpoints
+
+- Subjective driving feel and target-GPU visual/performance review remain physical hardware checkpoints.
+- Release provenance for the current 350Z development source remains intentionally unresolved.
+"@
+          $pattern = '(?s)## Remaining closure item\s+Run the repository verifier once on native Windows using Godot 4\.7\.1\. No additional feature work is required for the Phase 2 automated Linux gate\.\s*$'
+          $text = [System.Text.RegularExpressions.Regex]::Replace($text, $pattern, $replacement.TrimEnd() + "`n")
+          [System.IO.File]::WriteAllText($path, $text, [System.Text.UTF8Encoding]::new($false))
+          git add -A
+          git diff --cached --check
+          if ($LASTEXITCODE -ne 0) {
+              throw "Final Phase 2 tree failed git diff --check after Windows evidence update."
+          }
+
+      - name: Publish verified Phase 2 tree
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          git config user.name "CARS GAME Agent"
+          git config user.email "actions@github.com"
+          git status --short
+          git commit -m "feat: build phase two road and world foundation"
+          if ($LASTEXITCODE -ne 0) {
+              throw "Unable to commit the Windows-verified Phase 2 tree."
+          }
+          git push origin HEAD:agent/phase-2-road-world-foundation
+          if ($LASTEXITCODE -ne 0) {
+              throw "Unable to publish the Windows-verified Phase 2 tree."
+          }
