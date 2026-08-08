@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="TrafficVehicleDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://src/traffic/traffic_vehicle_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"traffic.vehicle.crossover"
+mass_kg = 1610.0
+dimensions_m = Vector3(1.88, 1.66, 4.55)
+wheelbase_m = 2.72
+max_accel_mps2 = 2.8
+max_brake_mps2 = 6.8

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="TrafficVehicleDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://src/traffic/traffic_vehicle_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"traffic.vehicle.sedan"
+mass_kg = 1420.0
+dimensions_m = Vector3(1.82, 1.47, 4.65)
+wheelbase_m = 2.72
+max_accel_mps2 = 3.0
+max_brake_mps2 = 7.1

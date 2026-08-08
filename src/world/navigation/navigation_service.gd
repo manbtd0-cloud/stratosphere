@@ -1,0 +1,94 @@
+class_name NavigationService
+extends RefCounted
+
+var _graph: NavigationGraph
+
+func _init(graph: NavigationGraph = null) -> void:
+	_graph = graph
+
+func set_graph(graph: NavigationGraph) -> void:
+	_graph = graph
+
+func find_route(start_id: StringName, goal_id: StringName) -> Array[StringName]:
+	var empty: Array[StringName] = []
+	if _graph == null or start_id.is_empty() or goal_id.is_empty(): return empty
+	if start_id == goal_id: return empty
+	if start_id not in _graph.node_ids() or goal_id not in _graph.node_ids(): return empty
+	var distance: Dictionary = {start_id: 0.0}
+	var previous_edge: Dictionary = {}
+	var open: Dictionary = {start_id: true}
+	var closed: Dictionary = {}
+	while not open.is_empty():
+		var current: StringName = _lowest_cost_node(open, distance)
+		open.erase(current)
+		if current == goal_id: break
+		closed[current] = true
+		for edge in _graph.outgoing_edges(current):
+			if closed.has(edge.to_node_id): continue
+			var candidate: float = float(distance[current]) + edge.cost_m
+			var old: float = float(distance.get(edge.to_node_id, INF))
+			var should_replace := candidate < old - 0.0001
+			if is_equal_approx(candidate, old) and previous_edge.has(edge.to_node_id):
+				should_replace = String(edge.id) < String(previous_edge[edge.to_node_id])
+			if should_replace:
+				distance[edge.to_node_id] = candidate
+				previous_edge[edge.to_node_id] = edge.id
+				open[edge.to_node_id] = true
+	if not previous_edge.has(goal_id): return empty
+	var reversed: Array[StringName] = []
+	var cursor := goal_id
+	while cursor != start_id:
+		if not previous_edge.has(cursor): return empty
+		var edge_id: StringName = previous_edge[cursor]
+		reversed.append(edge_id)
+		var edge := _graph.get_edge(edge_id)
+		if edge == null: return empty
+		cursor = edge.from_node_id
+	reversed.reverse()
+	return reversed
+
+func route_segment_ids(edge_ids: Array[StringName]) -> Array[StringName]:
+	var result: Array[StringName] = []
+	if _graph == null: return result
+	for edge_id in edge_ids:
+		var edge := _graph.get_edge(edge_id)
+		if edge != null: result.append(edge.road_segment_id)
+	return result
+
+func nearest_edge(world_position: Vector3) -> StringName:
+	if _graph == null: return &""
+	var best_id: StringName = &""
+	var best_distance := INF
+	for edge_id in _graph.edge_ids():
+		var edge := _graph.get_edge(edge_id)
+		var distance := _polyline_distance_squared(world_position, edge.sampled_positions)
+		if distance < best_distance - 0.0001 or (is_equal_approx(distance, best_distance) and String(edge_id) < String(best_id)):
+			best_distance = distance
+			best_id = edge_id
+	return best_id
+
+func _lowest_cost_node(open: Dictionary, distance: Dictionary) -> StringName:
+	var best: StringName = &""
+	var best_cost := INF
+	for raw_id in open.keys():
+		var node_id: StringName = raw_id
+		var cost: float = float(distance.get(node_id, INF))
+		if cost < best_cost - 0.0001 or (is_equal_approx(cost, best_cost) and (best.is_empty() or String(node_id) < String(best))):
+			best = node_id
+			best_cost = cost
+	return best
+
+func _polyline_distance_squared(point: Vector3, positions: PackedVector3Array) -> float:
+	if positions.is_empty(): return INF
+	if positions.size() == 1: return point.distance_squared_to(positions[0])
+	var best := INF
+	for index in range(positions.size() - 1):
+		best = minf(best, _point_segment_distance_squared(point, positions[index], positions[index + 1]))
+	return best
+
+func _point_segment_distance_squared(point: Vector3, a: Vector3, b: Vector3) -> float:
+	var delta := b - a
+	var length_sq := delta.length_squared()
+	if length_sq <= 0.000001: return point.distance_squared_to(a)
+	var t := clampf((point - a).dot(delta) / length_sq, 0.0, 1.0)
+	return point.distance_squared_to(a + delta * t)
