@@ -1,0 +1,175 @@
+oadSplineSampler.new()
++
++func build(network: RoadNetwork, grid: WorldGrid) -> TrafficLaneGraph:
++	if network == null or grid == null: return null
++	var graph := TrafficLaneGraph.new()
++	for segment in network.segments():
++		var profile := RoadProfile.for_id(segment.profile_id)
++		if profile == null: return null
++		for lane in _lanes_for_segment(segment, profile, grid):
++			if graph.add_lane(lane) != OK: return null
++	_build_connectors(network, graph)
++	return graph
++
++func _lanes_for_segment(segment: RoadSegment, profile: RoadProfile, grid: WorldGrid) -> Array[TrafficLane]:
++	var result: Array[TrafficLane] = []
++	var samples := _sampler.sample(segment, 6.0)
++	if samples.size() < 2: return result
++	var centers: Array[float] = []
++	for index in range(profile.lane_count):
++		centers.append(-profile.road_width_m() * 0.5 + profile.lane_width_m * (float(index) + 0.5))
++	if segment.travel_direction_policy == &"forward_only":
++		for index in range(centers.size()): result.append(_lane(segment, profile, grid, samples, &"forward", index, centers[index]))
++	elif segment.travel_direction_policy == &"reverse_only":
++		for index in range(centers.size()): result.append(_lane(segment, profile, grid, samples, &"reverse", index, centers[index]))
++	elif profile.lane_count == 1:
++		result.append(_lane(segment, profile, grid, samples, &"forward", 0, 0.0))
++	else:
++		var half := profile.lane_count / 2
++		var forward_index := 0
++		var reverse_index := 0
++		for center in centers:
++			if center > 0.0:
++				result.append(_lane(segment, profile, grid, samples, &"forward", forward_index, center)); forward_index += 1
++			elif center < 0.0:
++				result.append(_lane(segment, profile, grid, samples, &"reverse", reverse_index, center)); reverse_index += 1
++		if half > 0 and result.is_empty(): return result
++	return result
++
++func _lane(segment: RoadSegment, profile: RoadProfile, grid: WorldGrid, samples: Array[RoadSample], direction: StringName, lane_index: int, offset: float) -> TrafficLane:
++	var lane := TrafficLane.new()
++	lane.id = StringName("traffic.%s.%s%d" % [segment.id, "f" if direction == &"forward" else "r", lane_index])
++	lane.source_road_segment_id = segment.id
++	lane.direction = direction
++	lane.lateral_offset_m = offset
++	lane.lane_width_m = profile.lane_width_m
++	lane.speed_limit_kph = segment.speed_limit_kph
++	lane.start_junction_id = segment.start_junction_id if direction == &"forward" else segment.end_junction_id
++	lane.end_junction_id = segment.end_junction_id if direction == &"forward" else segment.start_junction_id
++	lane.civilian_enabled = profile.id != &"dirt_trail"
++	var original := PackedVector3Array()
++	for sample in samples: original.append(sample.position + sample.right * offset)
++	if direction == &"forward":
++		lane.sampled_positions = original
++	else:
++		var reversed := PackedVector3Array()
++		for index in range(original.size() - 1, -1, -1): reversed.append(original[index])
++		lane.sampled_positions = reversed
++	var seen_cells: Dictionary = {}
++	for position in lane.sampled_positions:
++		var coord := grid.world_to_coord(position)
++		if not grid.is_valid_coord(coord): continue
++		var cell_id := grid.coord_to_id(coord)
++		if not seen_cells.has(cell_id):
++			seen_cells[cell_id] = true
++			lane.cell_ids.append(cell_id)
++	return lane
++
++func _build_connectors(network: RoadNetwork, graph: TrafficLaneGraph) -> void:
++	for junction in network.junctions():
++		var incoming := graph.incoming_lanes(junction.id, true)
++		var outgoing := graph.outgoing_lanes(junction.id, true)
++		for from_lane in incoming:
++			for to_lane in outgoing:
++				if from_lane.source_road_segment_id == to_lane.source_road_segment_id: continue
++				var connector := TrafficLaneConnector.new()
++				connector.id = StringName("traffic.connector.%s.%s.%s" % [junction.id, from_lane.id, to_lane.id])
++				connector.from_lane_id = from_lane.id
++				connector.to_lane_id = to_lane.id
++				connector.junction_id = junction.id
++				assert(graph.add_connector(connector) == OK)
+diff --git a/src/traffic/traffic_manager.gd b/src/traffic/traffic_manager.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..817472db240c7dad5242fc6593b2d8ff9ad5286a
+--- /dev/null
++++ b/src/traffic/traffic_manager.gd
+@@ -0,0 +1,149 @@
++class_name TrafficManager
++extends Node3D
++
++var _graph: TrafficLaneGraph
++var _definitions: Array[TrafficVehicleDefinition] = []
++var _target_count: int = 12
++var _max_active: int = 20
++var _agents: Dictionary = {}
++var _cell_by_id: Dictionary = {}
++var _spawn_serial: int = 0
++var _spawner := TrafficSpawner.new()
++var _policy := TrafficSimulationPolicy.new()
++var _configured: bool = false
++
++func configure(graph: TrafficLaneGraph, definitions: Array[TrafficVehicleDefinition], target_count: int = 12, max_active: int = 20) -> PackedStringArray:
++	var errors := PackedStringArray()
++	if graph == null:
++		errors.append("traffic lane graph must not be null")
++	else:
++		for error in graph.validation_errors(): errors.append(error)
++	if definitions.is_empty():
++		errors.append("at least one traffic vehicle definition is required")
++	for definition in definitions:
++		if definition == null:
++			errors.append("traffic vehicle definition must not be null")
++			continue
++		for error in definition.validation_errors(): errors.append(error)
++	if max_active <= 0: errors.append("max active traffic must be positive")
++	if target_count < 0 or target_count > max_active: errors.append("traffic target must be within max-active budget")
++	if not _policy.validation_errors().is_empty():
++		for error in _policy.validation_errors(): errors.append(error)
++	if not errors.is_empty(): return errors
++	clear_all()
++	_graph = graph
++	_definitions = definitions.duplicate()
++	_target_count = target_count
++	_max_active = max_active
++	_configured = true
++	return errors
++
++func spawn_to_target(player_transform: Transform3D, density_multiplier: float = 1.0) -> void:
++	if not _configured: return
++	var desired := desired_count_for_density(density_multiplier)
++	var attempts := 0
++	var max_attempts := maxi(desired * 6, 12)
++	while active_count() < desired and attempts < max_attempts:
++		attempts += 1
++		var occupied: Array = []
++		for agent in _agents.values():
++			if is_instance_valid(agent): occupied.append((agent as TrafficAgent).position)
++		var candidate := _spawner.choose_candidate(_graph, player_transform, occupied)
++		if candidate == null: break
++		var lane := _graph.get_lane(candidate.lane_id)
++		if lane == null: break
++		var definition := _definitions[_spawn_serial % _definitions.size()]
++		var agent := TrafficAgent.new()
++		var errors := agent.configure(definition, lane)
++		if not errors.is_empty():
++			agent.free()
++			break
++		_spawn_serial += 1
++		agent.traffic_id = StringName("traffic.agent.%06d" % _spawn_serial)
++		agent.name = "TrafficAgent_%06d" % _spawn_serial
++		agent.position = candidate.position + Vector3.UP * 0.65
++		agent.basis = Basis.looking_at(candidate.forward, Vector3.UP)
++		_attach_development_body(agent, definition)
++		var level := _policy.level_for(agent.traffic_id, candidate.distance_to_player_m)
++		agent.set_simulation_level(level)
++		if register_existing(agent, candidate.cell_id) != OK:
++			agent.free()
++			break
++
++func desired_count_for_density(density_multiplier: float) -> int:
++	return clampi(roundi(float(_target_count) * maxf(density_multiplier, 0.0)), 0, _max_active)
++
++func register_existing(agent: TrafficAgent, cell_id: StringName) -> Error:
++	if agent == null or agent.traffic_id.is_empty() or cell_id.is_empty(): return ERR_INVALID_PARAMETER
++	if _agents.has(agent.traffic_id): return ERR_ALREADY_EXISTS
++	_agents[agent.traffic_id] = agent
++	_cell_by_id[agent.traffic_id] = cell_id
++	if agent.get_parent() == null:
++		add_child(agent)
++	return OK
++
++func reconcile_loaded_cells(loaded_cell_ids: PackedStringArray) -> void:
++	var loaded: Dictionary = {}
++	for cell_id in loaded_cell_ids: loaded[StringName(cell_id)] = true
++	var to_remove: Array[StringName] = []
++	for traffic_id in active_i
