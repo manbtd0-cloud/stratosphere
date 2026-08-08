@@ -1,0 +1,140 @@
+= _environment_fingerprint(region)
++	var checksum_source: String = JSON.stringify({
++		"stream": stream_evidence,
++		"traffic": traffic_evidence,
++		"environment": environment_fingerprint,
++		"lanes": lane_graph.fingerprint(),
++		"navigation_route": navigation_route,
++	})
++	return {
++		"authored_cells": region.authored_cell_coords.size(),
++		"route_steps": stream_evidence.route_steps,
++		"predictive_steps": stream_evidence.predictive_steps,
++		"max_gameplay_cells": stream_evidence.max_gameplay_cells,
++		"max_visual_cells": stream_evidence.max_visual_cells,
++		"max_predictive_cells": stream_evidence.max_predictive_cells,
++		"max_keep_resident_cells": stream_evidence.max_keep_resident_cells,
++		"traffic_candidates": traffic_evidence.count,
++		"duplicate_traffic_candidates": traffic_evidence.duplicate,
++		"navigation_edges": navigation_graph.edge_ids().size(),
++		"navigation_route_edges": navigation_route.size(),
++		"lane_graph_fingerprint": lane_graph.fingerprint(),
++		"environment_fingerprint": environment_fingerprint,
++		"checksum": checksum_source.sha256_text(),
++	}
++
++func _stream_evidence(region: DrivingRegionDefinition) -> Dictionary:
++	var route := [
++		Vector3(-1030,0,500), Vector3(-510,0,500), Vector3(-10,0,500), Vector3(510,0,500),
++		Vector3(900,0,500), Vector3(600,0,180), Vector3(450,0,-260), Vector3(0,0,-300),
++		Vector3(-450,0,-300), Vector3(-650,38,-620), Vector3(-350,88,-850),
++	]
++	var policy: WorldStreamingPolicy = WorldStreamingPolicy.new()
++	var config: WorldStreamingConfig = WorldStreamingConfig.new()
++	var residents: Dictionary = {}
++	var max_gameplay := 0
++	var max_visual := 0
++	var max_predictive := 0
++	var max_keep := 0
++	var predictive_steps := 0
++	for index in range(route.size()):
++		var direction := Vector3.FORWARD
++		if index < route.size() - 1: direction = (route[index + 1] - route[index]).normalized()
++		elif index > 0: direction = (route[index] - route[index - 1]).normalized()
++		var desired: Dictionary = policy.desired_cells(region.base_definition.grid, config, route[index], direction * 180.0, residents)
++		max_gameplay = maxi(max_gameplay, desired.gameplay.size())
++		max_visual = maxi(max_visual, desired.visual.size())
++		max_predictive = maxi(max_predictive, desired.predictive.size())
++		max_keep = maxi(max_keep, desired.keep_resident.size())
++		var gameplay: Dictionary = {}; for coord in desired.gameplay: gameplay[coord] = true
++		var ahead := false
++		for coord in desired.predictive:
++			if not gameplay.has(coord): ahead = true; break
++		if ahead: predictive_steps += 1
++		residents.clear()
++		for key in ["gameplay", "visual", "predictive", "keep_resident"]:
++			for coord in desired[key]: residents[coord] = true
++	return {"route_steps": route.size(), "predictive_steps": predictive_steps, "max_gameplay_cells": max_gameplay, "max_visual_cells": max_visual, "max_predictive_cells": max_predictive, "max_keep_resident_cells": max_keep}
++
++func _traffic_evidence(lane_graph: TrafficLaneGraph) -> Dictionary:
++	var spawner: TrafficSpawner = TrafficSpawner.new()
++	var player: Transform3D = Transform3D(Basis.IDENTITY, Vector3(0,0,500))
++	var occupied: Array = []
++	var fingerprints := PackedStringArray()
++	for _index in range(12):
++		var candidate: TrafficSpawnCandidate = spawner.choose_candidate(lane_graph, player, occupied)
++		if candidate == null: break
++		occupied.append(candidate.position)
++		fingerprints.append(candidate.fingerprint())
++	var seen: Dictionary = {}
++	var duplicate := false
++	for fingerprint in fingerprints:
++		if seen.has(fingerprint): duplicate = true
++		seen[fingerprint] = true
++	fingerprints.sort()
++	return {"count": fingerprints.size(), "duplicate": duplicate, "fingerprints": fingerprints}
++
++func _environment_fingerprint(region: DrivingRegionDefinition) -> String:
++	var placement: DeterministicPlacementService = DeterministicPlacementService.new()
++	var parts := PackedStringArray()
++	var grid: WorldGrid = region.base_definition.grid
++	for zone in region.zones:
++		for cell_id in zone.cell_ids:
++			var coord: Vector2i = grid.id_to_coord(cell_id)
++			if coord == WorldGrid.INVALID_COORD: continue
++			var center: Vector3 = grid.coord_to_center(coord)
++			var bounds: AABB = AABB(Vector3(center.x - 180.0, 0.0, center.z - 180.0), Vector3(360.0, 1.0, 360.0))
++			var transforms: Array[Transform3D] = placement.generate(zone, cell_id, &"phase3.probe", bounds, 5, 30.0)
++			for transform in transforms:
++				parts.append("%s|%s|%.3f|%.3f" % [zone.id, cell_id, transform.origin.x, transform.origin.z])
++	parts.sort()
++	return "|".join(parts).sha256_text()
+diff --git a/tests/phase3/test_01_environment_zones.gd b/tests/phase3/test_01_environment_zones.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..825571693f3cb35eca68863e90d5d454cb68292b
+--- /dev/null
++++ b/tests/phase3/test_01_environment_zones.gd
+@@ -0,0 +1,11 @@
++extends SceneTree
++func fail(m:String)->void: push_error("FAIL: "+m); quit(1)
++func _init()->void:
++	var script=load("res://src/world/environment/environment_zone_definition.gd")
++	if script==null: fail("EnvironmentZoneDefinition script must exist"); return
++	var zone=script.new();zone.id=&"forest.north_hill";zone.zone_class=&"forest";zone.cell_ids.assign([&"world.proving.c-01_p02"]);zone.vegetation_palette_ids.assign([&"veg.conifer"]);zone.density_multiplier=1.0
++	if not zone.validate().is_empty(): fail("valid zone rejected: %s"%zone.validate()); return
++	zone.id=&"";if zone.validate().is_empty():fail("empty id must reject");return
++	zone.id=&"forest.north_hill";zone.zone_class=&"lava";if zone.validate().is_empty():fail("unsupported class must reject");return
++	zone.zone_class=&"forest";zone.cell_ids.clear();if zone.validate().is_empty():fail("zone must own at least one cell");return
++	print("PASS: phase3 01_environment_zones");quit(0)
+diff --git a/tests/phase3/test_02_deterministic_placement.gd b/tests/phase3/test_02_deterministic_placement.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..5aa0a2cdc7ef138d92faab14e9628ce40f991541
+--- /dev/null
++++ b/tests/phase3/test_02_deterministic_placement.gd
+@@ -0,0 +1,26 @@
++extends SceneTree
++func fail(m:String)->void:push_error("FAIL: "+m);quit(1)
++func _init()->void:
++	var service_script=load("res://src/world/environment/deterministic_placement_service.gd")
++	if service_script==null:fail("DeterministicPlacementService script must exist");return
++	var zone_script=load("res://src/world/environment/environment_zone_definition.gd");var zone=zone_script.new();zone.id=&"forest.north_hill";zone.zone_class=&"forest";zone.cell_ids.assign([&"world.proving.c-01_p02"])
++	var service=service_script.new();var bounds:=AABB(Vector3(-100,0,-100),Vector3(200,0,200))
++	var a:Array[Transform3D]=service.generate(zone,&"world.proving.c-01_p02",&"trees",bounds,20,8.0)
++	var b:Array[Transform3D]=service.generate(zone,&"world.proving.c-01_p02",&"trees",bounds,20,8.0)
++	if a.size()!=20 or b.size()!=20:fail("placement must satisfy feasible count");return
++	if _fingerprint(a)!=_fingerprint(b):fail("repeat placement must be deterministic");return
++	var c:Array[Transform3D]=service.generate(zone,&"world.proving.c-01_p02",&"bushes",bounds,20,8.0)
++	if _fingerprint(a)==_fingerprint(c):fail("layer id must affect deterministic seed");return
++	for i in a.size():
++		var p:=a[i].origin
++		if p.x<bounds.position.x or p.x>bounds.end.x or p.z<bounds.position.z or p.z>bounds.end.z:fail("placement escaped bounds");return
++		for j in range(i):
++			if p.distance_to(a[j].origin)<7.99:fail("minimum spacing violated");return
++	var impossible:Array[Transform3D]=service.generate(zone,&"world.proving.c-01_p02",&"impossible",AABB(Vector3.ZERO,Vector3(1,0,1)),10,10.0)
++	if not impossible.is_empty():fail("impossible request must fail closed");return
++	print("PASS: phase3 02_deterministic_placement");quit(0)
++func _fingerprint(values:Array[Transform3D])->String:
++	var s:=""
++	for t in values:
++		s+="%.3f,%.3f,%.3f;"%[t.origin.x,t.origin.y,t.origin.z]
++	return s.sha256_text()
