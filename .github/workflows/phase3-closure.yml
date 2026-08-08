@@ -1,0 +1,132 @@
+name: Phase 3 Complete Driving Region Closure
+
+on:
+  pull_request:
+    branches:
+      - agent/phase-3-closure-base
+
+permissions:
+  contents: write
+
+jobs:
+  linux-verify-and-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact Phase 3 feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase-3-complete-driving-region
+          fetch-depth: 0
+
+      - name: Reconstruct exact Phase 3 implementation patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/phase-3-closure-payload
+          mapfile -t chunks < <(git ls-tree -r --name-only FETCH_HEAD -- .phase3_payload | sort)
+          if [[ "${#chunks[@]}" -ne 19 ]]; then
+            echo "Expected 19 Phase 3 payload chunks, found ${#chunks[@]}" >&2
+            exit 1
+          fi
+          patch="$RUNNER_TEMP/phase3.patch"
+          : > "$patch"
+          for chunk in "${chunks[@]}"; do
+            git show "FETCH_HEAD:$chunk" >> "$patch"
+          done
+          expected="5f999765346bcddf0836dabfd639d1ea905b84bea99a997a06b91b8ae5ad3579"
+          actual="$(sha256sum "$patch" | awk '{print $1}')"
+          echo "Phase 3 patch SHA-256: $actual"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "Phase 3 payload integrity failure: expected $expected" >&2
+            exit 1
+          fi
+          git apply --index --whitespace=error-all "$patch"
+          git diff --cached --check
+          count="$(grep -c '^res://' tests/test_manifest.txt)"
+          if [[ "$count" -ne 103 ]]; then
+            echo "Expected 103 manifest tests after Phase 3 patch, got $count" >&2
+            exit 1
+          fi
+          echo "PASS: exact Phase 3 patch reconstructed; manifest=$count"
+
+      - name: Install official Godot 4.7.1 Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl -L --fail --retry 3 \
+            -o "$RUNNER_TEMP/godot.zip" \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP/godot"
+          godot="$RUNNER_TEMP/godot/Godot_v4.7.1-stable_linux.x86_64"
+          chmod +x "$godot"
+          version="$($godot --version)"
+          echo "$version"
+          [[ "$version" == 4.7.1.stable.official.a13da4feb* ]]
+          echo "GODOT_BIN=$godot" >> "$GITHUB_ENV"
+
+      - name: Run full Linux repository gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          GODOT_BIN="$GODOT_BIN" ./tools/verify/verify.sh
+
+      - name: Run deterministic Phase 3 driving-world probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --fixed-fps 120 --path . \
+            --script res://tools/benchmark/run_phase3_driving_world_probe.gd
+
+      - name: Publish Linux-verified Phase 3 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --cached --check
+          git config user.name "CARS GAME Agent"
+          git config user.email "actions@github.com"
+          git commit -m "feat: build phase three complete driving region"
+          git push origin HEAD:agent/phase-3-complete-driving-region
+
+  windows-verify:
+    needs: linux-verify-and-publish
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - name: Check out published Phase 3 branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase-3-complete-driving-region
+          fetch-depth: 0
+
+      - name: Install official Godot 4.7.1 Windows
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tools = Join-Path $env:RUNNER_TEMP "godot-4.7.1"
+          $archive = Join-Path $env:RUNNER_TEMP "godot-4.7.1.zip"
+          New-Item -ItemType Directory -Force -Path $tools | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $tools -Force
+          $godot = Join-Path $tools "Godot_v4.7.1-stable_win64.exe"
+          if (-not (Test-Path $godot)) { throw "Official Godot 4.7.1 executable missing" }
+          "GODOT_BIN=$godot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run full native Windows repository gate
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -ExecutionPolicy Bypass -File .\tools\verify\verify.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows repository verification failed: $LASTEXITCODE" }
+
+      - name: Run native Windows Phase 3 probe
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $process = Start-Process -FilePath $env:GODOT_BIN -ArgumentList @(
+            "--headless", "--fixed-fps", "120", "--path", ".",
+            "--script", "res://tools/benchmark/run_phase3_driving_world_probe.gd"
+          ) -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Windows Phase 3 probe failed: $($process.ExitCode)" }
+          Write-Host "PASS: native Windows Phase 3 deterministic probe"
