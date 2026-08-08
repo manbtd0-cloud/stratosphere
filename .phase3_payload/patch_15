@@ -1,0 +1,147 @@
+ests/phase3/test_13_traffic_spawner.gd b/tests/phase3/test_13_traffic_spawner.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..bc112a0440502d3cb5184da45e89bce0138e0099
+--- /dev/null
++++ b/tests/phase3/test_13_traffic_spawner.gd
+@@ -0,0 +1,37 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var spawner_script = load("res://src/traffic/traffic_spawner.gd")
++	if spawner_script == null:
++		fail("TrafficSpawner script must exist")
++		return
++	var spawner = spawner_script.new()
++	var player := Transform3D(Basis.IDENTITY, Vector3.ZERO)
++	if spawner.is_candidate_safe(Vector3(0,0,-100), Vector3.FORWARD, player, []):
++		fail("close candidate in player's forward view cone must reject")
++		return
++	if spawner.is_candidate_safe(Vector3(0,0,40), Vector3.BACK, player, []):
++		fail("candidate below minimum player distance must reject")
++		return
++	if spawner.is_candidate_safe(Vector3(0,0,180), Vector3.BACK, player, [Vector3(0,0,181)]):
++		fail("candidate overlapping occupied lane space must reject")
++		return
++	if not spawner.is_candidate_safe(Vector3(120,0,160), Vector3.BACK, player, []):
++		fail("valid side/behind candidate should be accepted")
++		return
++	var region := DrivingRegionFactory.create()
++	var graph := TrafficLaneGraphBuilder.new().build(region.base_definition.road_network, region.base_definition.grid)
++	var candidate = spawner.choose_candidate(graph, player, [])
++	if candidate == null or candidate.lane_id.is_empty() or candidate.position.distance_to(player.origin) < spawner.min_player_distance_m:
++		fail("spawner must choose a safe deterministic lane candidate")
++		return
++	var repeat = spawner.choose_candidate(graph, player, [])
++	if repeat == null or repeat.fingerprint() != candidate.fingerprint():
++		fail("spawn candidate choice must be deterministic")
++		return
++	print("PASS: phase3 13_traffic_spawner")
++	quit(0)
+diff --git a/tests/phase3/test_14_traffic_manager.gd b/tests/phase3/test_14_traffic_manager.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ae049345bf63df45fbb70329139929f5a3ebe92
+--- /dev/null
++++ b/tests/phase3/test_14_traffic_manager.gd
+@@ -0,0 +1,59 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	call_deferred("run")
++
++func run() -> void:
++	var manager_script = load("res://src/traffic/traffic_manager.gd")
++	if manager_script == null:
++		fail("TrafficManager script must exist")
++		return
++	var region := DrivingRegionFactory.create()
++	var graph := TrafficLaneGraphBuilder.new().build(region.base_definition.road_network, region.base_definition.grid)
++	var definitions: Array[TrafficVehicleDefinition] = []
++	for suffix in ["compact", "sedan", "utility"]:
++		var definition := TrafficVehicleDefinition.new()
++		definition.id = StringName("traffic.vehicle.%s" % suffix)
++		definitions.append(definition)
++	var manager = manager_script.new()
++	root.add_child(manager)
++	var errors: PackedStringArray = manager.configure(graph, definitions, 12, 20)
++	if not errors.is_empty(): fail("valid traffic manager config rejected: %s" % errors); manager.queue_free(); await process_frame; return
++	var player := Transform3D(Basis.IDENTITY, Vector3.ZERO)
++	manager.spawn_to_target(player, 1.0)
++	if manager.active_count() <= 0 or manager.active_count() > 12:
++		fail("manager must create a bounded initial traffic population"); manager.queue_free(); await process_frame; return
++	if _has_duplicates(manager.active_ids()): fail("manager must never own duplicate traffic IDs"); manager.queue_free(); await process_frame; return
++	if manager.desired_count_for_density(2.0) > 20 or manager.desired_count_for_density(0.0) != 0:
++		fail("traffic density scaling must obey global budget"); manager.queue_free(); await process_frame; return
++	var active_before: int = manager.active_count()
++	var first_agent: TrafficAgent = manager.agent_for_id(manager.active_ids()[0])
++	if manager.register_existing(first_agent, &"world.proving.cp00_p00") != ERR_ALREADY_EXISTS:
++		fail("duplicate traffic-agent registration must reject"); manager.queue_free(); await process_frame; return
++	if manager.active_count() != active_before:
++		fail("duplicate registration must not change population"); manager.queue_free(); await process_frame; return
++	manager.reconcile_loaded_cells(PackedStringArray())
++	await process_frame
++	if manager.active_count() != 0:
++		fail("unloaded cells must release all owned traffic agents"); manager.queue_free(); await process_frame; return
++	for _cycle in range(4):
++		manager.spawn_to_target(player, 0.75)
++		if manager.active_count() > manager.desired_count_for_density(0.75) or _has_duplicates(manager.active_ids()):
++			fail("repeated traffic population cycles must remain bounded/unique"); manager.queue_free(); await process_frame; return
++		manager.clear_all()
++		await process_frame
++		if manager.active_count() != 0: fail("clear_all must release registry ownership"); manager.queue_free(); await process_frame; return
++	manager.queue_free(); await process_frame
++	print("PASS: phase3 14_traffic_manager")
++	quit(0)
++
++func _has_duplicates(values: PackedStringArray) -> bool:
++	var seen: Dictionary = {}
++	for value in values:
++		if seen.has(value): return true
++		seen[value] = true
++	return false
+diff --git a/tests/phase3/test_15_driving_region_scene.gd b/tests/phase3/test_15_driving_region_scene.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..25031cd8f5fd9c05596ae879775c18ad607f466c
+--- /dev/null
++++ b/tests/phase3/test_15_driving_region_scene.gd
+@@ -0,0 +1,36 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	call_deferred("run")
++
++func run() -> void:
++	var packed := load("res://scenes/world/proving_region.tscn") as PackedScene
++	if packed == null: fail("proving-region scene must load"); return
++	var world = packed.instantiate()
++	root.add_child(world)
++	await process_frame
++	await physics_frame
++	if not world.has_method("get_driving_region_definition") or not world.has_method("get_navigation_service") or not world.has_method("get_traffic_manager"):
++		fail("Phase 3 scene must expose driving-region/navigation/traffic accessors"); world.queue_free(); await process_frame; return
++	var region = world.get_driving_region_definition()
++	if region == null or not region.validate().is_empty(): fail("runtime driving-region definition must validate"); world.queue_free(); await process_frame; return
++	var player = world.get_player_vehicle()
++	if player == null or not player is VehicleController: fail("Phase 1 player vehicle must remain the free-roam player") ; world.queue_free(); await process_frame; return
++	var phase3_environment := world.get_node_or_null("WorldRuntime/EnvironmentRoot/Phase3Environment")
++	var presentation := world.get_node_or_null("WorldRuntime/RoadsRoot/Phase3Presentation")
++	var traffic_root := world.get_node_or_null("WorldRuntime/TrafficRoot")
++	if phase3_environment == null or presentation == null or traffic_root == null:
++		fail("Phase 3 runtime must contain environment, road-presentation, and traffic roots"); world.queue_free(); await process_frame; return
++	if world.get_node_or_null("WorldRuntime/EnvironmentRoot/Sun") == null or world.get_node_or_null("WorldRuntime/EnvironmentRoot/WorldEnvironment") == null:
++		fail("static daytime lighting must remain present"); world.queue_free(); await process_frame; return
++	if world.find_child("WeatherSystem", true, false) != null or world.find_child("DayNightSystem", true, false) != null:
++		fail("Phase 3 must not introduce weather or day/night runtime systems"); world.queue_free(); await process_frame; return
++	var manager: TrafficManager = world.get_traffic_manager()
++	if manager == null or manager.active_count() <= 0: fail("free-roam scene must begin with basic civilian traffic") ; world.queue_free(); await p
