@@ -1,0 +1,189 @@
+in_player_distance_m or distance > max_spawn_distance_m:
++		return false
++	if distance <= close_view_distance_m and distance > 0.001:
++		var view_forward := -player_transform.basis.z.normalized()
++		if view_forward.dot(to_candidate / distance) > view_cone_dot_threshold:
++			return false
++	for occupied in occupied_positions:
++		if occupied is Vector3 and position.distance_to(occupied) < occupied_clearance_m:
++			return false
++	return true
++
++func choose_candidate(graph: TrafficLaneGraph, player_transform: Transform3D, occupied_positions: Array) -> TrafficSpawnCandidate:
++	if graph == null:
++		return null
++	var candidates: Array[Dictionary] = []
++	for lane_id in graph.lane_ids():
++		var lane := graph.get_lane(lane_id)
++		if lane == null or not lane.civilian_enabled:
++			continue
++		var positions := lane.sampled_positions
++		for index in range(0, positions.size(), 3):
++			var position := positions[index]
++			var forward := _path_forward(positions, index)
++			if not is_candidate_safe(position, forward, player_transform, occupied_positions):
++				continue
++			var distance := position.distance_to(player_transform.origin)
++			var candidate := TrafficSpawnCandidate.new()
++			candidate.lane_id = lane.id
++			candidate.position = position
++			candidate.forward = forward
++			candidate.sample_index = index
++			candidate.distance_to_player_m = distance
++			candidate.cell_id = _cell_id_for_sample(lane, index)
++			var score := absf(distance - preferred_spawn_distance_m)
++			candidates.append({"candidate": candidate, "score": score, "key": candidate.fingerprint()})
++	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
++		var score_a: float = float(a.score)
++		var score_b: float = float(b.score)
++		if not is_equal_approx(score_a, score_b):
++			return score_a < score_b
++		return String(a.key) < String(b.key)
++	)
++	if candidates.is_empty():
++		return null
++	return candidates[0].candidate as TrafficSpawnCandidate
++
++func _path_forward(positions: PackedVector3Array, index: int) -> Vector3:
++	if positions.size() < 2:
++		return Vector3.FORWARD
++	var a_index := clampi(index, 0, positions.size() - 1)
++	var b_index := mini(a_index + 1, positions.size() - 1)
++	if b_index == a_index:
++		a_index = maxi(0, a_index - 1)
++	var forward := positions[b_index] - positions[a_index]
++	return forward.normalized() if forward.length_squared() > 0.0001 else Vector3.FORWARD
++
++func _cell_id_for_sample(lane: TrafficLane, sample_index: int) -> StringName:
++	if lane.cell_ids.is_empty():
++		return &""
++	var normalized := float(sample_index) / maxf(float(lane.sampled_positions.size() - 1), 1.0)
++	var cell_index := clampi(floori(normalized * float(lane.cell_ids.size())), 0, lane.cell_ids.size() - 1)
++	return lane.cell_ids[cell_index]
+diff --git a/src/traffic/traffic_vehicle_definition.gd b/src/traffic/traffic_vehicle_definition.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..7085961927d8f600e508f7c635386148263ba7cc
+--- /dev/null
++++ b/src/traffic/traffic_vehicle_definition.gd
+@@ -0,0 +1,22 @@
++class_name TrafficVehicleDefinition
++extends Resource
++
++@export var id: StringName = &""
++@export var mass_kg: float = 1350.0
++@export var dimensions_m: Vector3 = Vector3(1.78, 1.45, 4.35)
++@export var wheelbase_m: float = 2.62
++@export var max_accel_mps2: float = 3.2
++@export var max_brake_mps2: float = 7.0
++@export var steering_torque_per_kg: float = 1.4
++@export var path_divergence_recovery_m: float = 20.0
++@export var recovery_delay_s: float = 3.0
++
++func validation_errors() -> PackedStringArray:
++	var errors := PackedStringArray()
++	if id.is_empty(): errors.append("traffic vehicle id must not be empty")
++	if mass_kg <= 100.0: errors.append("traffic vehicle mass must be plausible")
++	if dimensions_m.x <= 0.5 or dimensions_m.y <= 0.5 or dimensions_m.z <= 1.0: errors.append("traffic vehicle dimensions must be positive")
++	if wheelbase_m <= 1.0 or wheelbase_m >= dimensions_m.z: errors.append("traffic wheelbase must fit vehicle length")
++	if max_accel_mps2 <= 0.0 or max_brake_mps2 <= 0.0: errors.append("traffic acceleration/braking limits must be positive")
++	if recovery_delay_s <= 0.0 or path_divergence_recovery_m <= 0.0: errors.append("traffic recovery thresholds must be positive")
++	return errors
+diff --git a/src/world/environment/deterministic_placement_service.gd b/src/world/environment/deterministic_placement_service.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2d46351032848c8bcdb3f622c2e38a82a27243f
+--- /dev/null
++++ b/src/world/environment/deterministic_placement_service.gd
+@@ -0,0 +1,58 @@
++class_name DeterministicPlacementService
++extends RefCounted
++
++const MAX_ATTEMPTS_PER_INSTANCE := 96
++
++func generate(
++	zone: EnvironmentZoneDefinition,
++	cell_id: StringName,
++	layer_id: StringName,
++	bounds: AABB,
++	count: int,
++	min_spacing: float
++) -> Array[Transform3D]:
++	var result: Array[Transform3D] = []
++	if zone == null or not zone.validate().is_empty() or cell_id.is_empty() or layer_id.is_empty():
++		return result
++	if count <= 0:
++		return result
++	if bounds.size.x <= 0.0 or bounds.size.z <= 0.0 or min_spacing < 0.0:
++		return result
++	# Cheap feasibility bound prevents obviously impossible requests from burning attempts.
++	if min_spacing > 0.0:
++		var estimated_capacity := int(floor((bounds.size.x / min_spacing + 1.0) * (bounds.size.z / min_spacing + 1.0)))
++		if count > estimated_capacity:
++			return result
++	var rng := RandomNumberGenerator.new()
++	rng.seed = _stable_seed(zone.id, cell_id, layer_id)
++	var attempts := 0
++	var max_attempts := maxi(count * MAX_ATTEMPTS_PER_INSTANCE, MAX_ATTEMPTS_PER_INSTANCE)
++	while result.size() < count and attempts < max_attempts:
++		attempts += 1
++		var position := Vector3(
++			rng.randf_range(bounds.position.x, bounds.end.x),
++			bounds.position.y,
++			rng.randf_range(bounds.position.z, bounds.end.z)
++		)
++		if not _is_spaced(position, result, min_spacing):
++			continue
++		var yaw := rng.randf_range(-PI, PI)
++		result.append(Transform3D(Basis(Vector3.UP, yaw), position))
++	if result.size() != count:
++		result.clear()
++	return result
++
++func _stable_seed(zone_id: StringName, cell_id: StringName, layer_id: StringName) -> int:
++	var digest := ("%s|%s|%s" % [zone_id, cell_id, layer_id]).sha256_text()
++	return digest.substr(0, 15).hex_to_int()
++
++func _is_spaced(position: Vector3, existing: Array[Transform3D], min_spacing: float) -> bool:
++	if min_spacing <= 0.0:
++		return true
++	var min_sq := min_spacing * min_spacing
++	for transform in existing:
++		var delta := transform.origin - position
++		delta.y = 0.0
++		if delta.length_squared() < min_sq:
++			return false
++	return true
+diff --git a/src/world/environment/environment_cluster_builder.gd b/src/world/environment/environment_cluster_builder.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..70a9ec4cb7bca0748cce14efc9eca696855e3405
+--- /dev/null
++++ b/src/world/environment/environment_cluster_builder.gd
+@@ -0,0 +1,64 @@
++class_name EnvironmentClusterBuilder
++extends RefCounted
++
++func build_cluster(
++	cluster_id: StringName,
++	cell_id: StringName,
++	mesh: Mesh,
++	transforms: Array[Transform3D],
++	density_multiplier: float = 1.0
++) -> MultiMeshInstance3D:
++	if cluster_id.is_empty() or cell_id.is_empty() or mesh == null:
++		return null
++	var density := clampf(density_multiplier, 0.0, 1.0)
++	var desired_count := clampi(roundi(float(transforms.size()) * density), 0, transforms.size())
++	var ranked: Array[Dictionary] = []
++	for index in range(transforms.size()):
++		var fingerprint := _transform_key(transforms[index])
++		ranked.append({
++			"score": ("%s|%s|%s" % [cluster_id, cell_id, fingerprint]).sha256_text(),
++			"index": index,
++			"fingerprint": fingerprint,
++		})
++	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
++		if a.score == b.score:
++			return int(a.index) < int(b.index)
++		return String(a.score) < String(b.score)
++	)
++	var selected := ranked.slice(0, desired_count)
++	selected.sort_custom(func(a: Dictionary
