@@ -1,0 +1,159 @@
+ype needs an asset/provenance record"); return
++	var registry := AssetRegistry.new()
++	for record in records:
++		if record.kind != &"vehicle_traffic" or record.source.strip_edges().is_empty() or record.cleanup_notes.strip_edges().is_empty():
++			fail("traffic record must declare kind/source/provenance notes")
++			registry.free(); return
++		if record.runtime_status != &"development" or record.lod_count < 3:
++			fail("development traffic record must expose runtime status and >=3 LOD states")
++			registry.free(); return
++		if registry.register(record) != OK:
++			fail("traffic asset record must satisfy AssetRegistry contract: %s" % record.id)
++			registry.free(); return
++	registry.free()
++	print("PASS: phase3 18_traffic_roster")
++	quit(0)
+diff --git a/tests/phase3/test_19_driving_region_validation.gd b/tests/phase3/test_19_driving_region_validation.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..903642eb0532bce12aec72efef8ad6bd788fb918
+--- /dev/null
++++ b/tests/phase3/test_19_driving_region_validation.gd
+@@ -0,0 +1,47 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var validator_script = load("res://src/world/validation/driving_region_validator.gd")
++	if validator_script == null:
++		fail("DrivingRegionValidator script must exist")
++		return
++	var validator = validator_script.new()
++	var region := DrivingRegionFactory.create()
++	var lane_graph := TrafficLaneGraphBuilder.new().build(region.base_definition.road_network, region.base_definition.grid)
++	var definitions := TrafficRosterFactory.create_development_roster()
++	var runtime := DrivingRegionBuilder.new().build(region)
++	var errors: PackedStringArray = validator.validate(region, lane_graph, definitions, runtime)
++	if not errors.is_empty(): fail("canonical Phase 3 region must validate: %s" % errors); runtime.free(); return
++	var duplicate_definitions := definitions.duplicate()
++	duplicate_definitions.append(definitions[0])
++	if not _contains(validator.validate(region, lane_graph, duplicate_definitions, runtime), "duplicate traffic vehicle id"):
++		fail("validator must reject duplicate traffic roster IDs"); runtime.free(); return
++	var dirt_graph := TrafficLaneGraphBuilder.new().build(region.base_definition.road_network, region.base_definition.grid)
++	var dirt_lanes := dirt_graph.lanes_for_road(&"road.dirt.cutthrough")
++	dirt_lanes[0].civilian_enabled = true
++	if not _contains(validator.validate(region, dirt_graph, definitions, runtime), "dirt_trail"):
++		fail("validator must reject civilian traffic enabled on dirt trail by default"); runtime.free(); return
++	var garage_transform: Transform3D = region.facility_hooks[&"garage"]
++	region.facility_hooks.erase(&"garage")
++	if not _contains(validator.validate(region, lane_graph, definitions, runtime), "garage"):
++		fail("validator must reject missing garage hook"); runtime.free(); return
++	region.facility_hooks[&"garage"] = garage_transform
++	var environment := runtime.get_node("EnvironmentRoot/Phase3Environment")
++	var first_cell := environment.get_child(0)
++	var original_cell_id: StringName = first_cell.get_meta("cell_id")
++	first_cell.set_meta("cell_id", &"")
++	if not _contains(validator.validate(region, lane_graph, definitions, runtime), "cell ownership"):
++		fail("validator must reject environment groups without stable cell ownership"); runtime.free(); return
++	first_cell.set_meta("cell_id", original_cell_id)
++	runtime.free()
++	print("PASS: phase3 19_driving_region_validation")
++	quit(0)
++
++func _contains(values: PackedStringArray, fragment: String) -> bool:
++	for value in values:
++		if String(value).contains(fragment): return true
++	return false
+diff --git a/tests/phase3/test_20_traffic_stream_probe.gd b/tests/phase3/test_20_traffic_stream_probe.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..a69d9ebb84cdfdf10288d90b5cffcdc1c410e66d
+--- /dev/null
++++ b/tests/phase3/test_20_traffic_stream_probe.gd
+@@ -0,0 +1,25 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var probe_script = load("res://src/world/validation/driving_world_probe.gd")
++	if probe_script == null:
++		fail("DrivingWorldProbe script must exist")
++		return
++	var first: Dictionary = probe_script.new().run()
++	var second: Dictionary = probe_script.new().run()
++	if first.is_empty() or second.is_empty(): fail("Phase 3 logical probe must return evidence"); return
++	if first.checksum != second.checksum: fail("Phase 3 probe checksum must be deterministic"); return
++	if int(first.authored_cells) != 20: fail("probe must cover 20 authored cells (~5.24 km2)"); return
++	if int(first.route_steps) < 8 or int(first.predictive_steps) <= 0: fail("probe must exercise a representative predictive-driving route"); return
++	if int(first.max_gameplay_cells) > 9 or int(first.max_visual_cells) > 49 or int(first.max_predictive_cells) > 9:
++		fail("Phase 3 probe exceeded Phase 2 streaming bounds"); return
++	if int(first.traffic_candidates) < 8 or int(first.traffic_candidates) > 20 or bool(first.duplicate_traffic_candidates):
++		fail("Phase 3 traffic probe must produce a bounded unique logical population"); return
++	if int(first.navigation_edges) <= 0 or int(first.navigation_route_edges) <= 0:
++		fail("Phase 3 probe must exercise routable navigation") ; return
++	print("PASS: phase3 20_traffic_stream_probe")
++	quit(0)
+diff --git a/tools/benchmark/run_phase3_driving_world_probe.gd b/tools/benchmark/run_phase3_driving_world_probe.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e3f434381a6c5739b1f882bc6638f1b1eb81928
+--- /dev/null
++++ b/tools/benchmark/run_phase3_driving_world_probe.gd
+@@ -0,0 +1,11 @@
++extends SceneTree
++
++func _init() -> void:
++	var evidence := DrivingWorldProbe.new().run()
++	if evidence.is_empty():
++		push_error("FAIL: Phase 3 driving-world probe produced no evidence")
++		quit(1)
++		return
++	print("PHASE3_PROBE %s" % JSON.stringify(evidence))
++	print("PASS: phase3 driving-world deterministic probe")
++	quit(0)
+diff --git a/src/world/terrain/terrain_backend_adapter.gd b/src/world/terrain/terrain_backend_adapter.gd
+--- a/src/world/terrain/terrain_backend_adapter.gd
++++ b/src/world/terrain/terrain_backend_adapter.gd
+@@ -17,3 +17,14 @@
+ 
+ func supports(_feature: StringName) -> bool:
+ 	return false
++
++func sample_height(_world_position: Vector3) -> float:
++	return 0.0
++
++func sample_normal(world_position: Vector3) -> Vector3:
++	var epsilon := 2.0
++	var left := sample_height(world_position + Vector3(-epsilon, 0.0, 0.0))
++	var right := sample_height(world_position + Vector3(epsilon, 0.0, 0.0))
++	var back := sample_height(world_position + Vector3(0.0, 0.0, -epsilon))
++	var forward := sample_height(world_position + Vector3(0.0, 0.0, epsilon))
++	return Vector3(left - right, epsilon * 2.0, back - forward).normalized()
+diff --git a/src/world/terrain/builtin_terrain_backend.gd b/src/world/terrain/builtin_terrain_backend.gd
+--- a/src/world/terrain/builtin_terrain_backend.gd
++++ b/src/world/terrain/builtin_terrain_backend.gd
+@@ -5,7 +5,7 @@
+ 	return &"builtin_grid"
+ 
+ func supports(feature: StringName) -> bool:
+-	return feature in [&"cell_visual", &"cell_collision", &"surface_metadata", &"height_interface"]
++	return feature in [&"cell_visual", &"cell_collision", &"surface_metadata", &"height_interface", &"height_sampling"]
+ 
+ func create_cell(cell: WorldCellDefinition, grid: WorldGrid) -> Node3D:
+ 	if cell == null or grid == null or not cell.validation_errors(grid).is_empty():
+@@ -45,5 +45,25 @@
+ 	root.add_child(body)
+ 	return root
+ 
+-func height_at_world(_world_position: Vector3) -> float:
+-	return 0.0
++func sample_height(world_position: Vector3) -> float:
++	var x := world_position.x
++	var z := world_position.z
++	var rolling := sin(x * 0.0018) * 5.0 + cos(z * 0.0015) * 4.0 + sin((x + z) * 0.0009) * 3.0
++	var dx := x + 430.0
++	var dz := z + 760.0
++	var hill_distance_sq := dx * dx + dz 
