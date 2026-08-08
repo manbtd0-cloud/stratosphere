@@ -137,4 +137,4 @@ index 0000000000000000000000000000000000000000..5aa0a2cdc7ef138d92faab14e9628ce4
 +	var s:=""
 +	for t in values:
 +		s+="%.3f,%.3f,%.3f;"%[t.origin.x,t.origin.y,t.origin.z]
-+	return s.sha256_text()
++	return s.sha256_text
