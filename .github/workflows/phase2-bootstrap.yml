@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/phase-2-road-world-foundation
+  pull_request:
+    branches:
+      - agent/phase-1-vehicle-lab
 
 permissions:
   contents: read
