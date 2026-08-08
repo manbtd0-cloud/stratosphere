@@ -1,0 +1,185 @@
+que stable instance IDs")
++		first.free(); return
++	var fingerprint := String(first.get_meta("transform_fingerprint", ""))
++	var repeat: MultiMeshInstance3D = builder.build_cluster(&"forest.test", &"world.proving.cp00_p00", mesh, transforms, 0.5)
++	if repeat.multimesh.instance_count != first.multimesh.instance_count or String(repeat.get_meta("transform_fingerprint", "")) != fingerprint:
++		fail("rebuilding a deterministic cluster must reproduce transforms")
++		first.free(); repeat.free(); return
++	first.free(); repeat.free()
++	print("PASS: phase3 06_environment_clusters")
++	quit(0)
++
++func _has_duplicates(values: PackedStringArray) -> bool:
++	var seen: Dictionary = {}
++	for value in values:
++		if seen.has(value):
++			return true
++		seen[value] = true
++	return false
+diff --git a/tests/phase3/test_07_navigation_graph.gd b/tests/phase3/test_07_navigation_graph.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..68ce10acf2ba9507aebaada3f76117ac5f71cf16
+--- /dev/null
++++ b/tests/phase3/test_07_navigation_graph.gd
+@@ -0,0 +1,62 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var builder_script = load("res://src/world/navigation/navigation_graph_builder.gd")
++	if builder_script == null:
++		fail("NavigationGraphBuilder script must exist")
++		return
++	var region := DrivingRegionFactory.create()
++	var graph = builder_script.new().build(region.base_definition.road_network)
++	if graph == null:
++		fail("navigation graph must build from authoritative roads")
++		return
++	var errors: PackedStringArray = graph.validation_errors()
++	if not errors.is_empty():
++		fail("canonical navigation graph invalid: %s" % errors)
++		return
++	if graph.node_count() != region.base_definition.road_network.junctions().size():
++		fail("every authoritative road junction must become a navigation node")
++		return
++	for segment in region.base_definition.road_network.segments():
++		var forward_id := StringName("nav.%s.forward" % segment.id)
++		if graph.get_edge(forward_id) == null:
++			fail("missing forward navigation edge for %s" % segment.id)
++			return
++		if segment.travel_direction_policy == &"bidirectional":
++			var reverse_id := StringName("nav.%s.reverse" % segment.id)
++			if graph.get_edge(reverse_id) == null:
++				fail("bidirectional road missing reverse edge: %s" % segment.id)
++				return
++	var one_way_network := _one_way_network()
++	var one_way_graph = builder_script.new().build(one_way_network)
++	if one_way_graph.get_edge(&"nav.road.oneway.forward") == null:
++		fail("forward-only road must produce forward edge")
++		return
++	if one_way_graph.get_edge(&"nav.road.oneway.reverse") != null:
++		fail("forward-only road must not produce reverse edge")
++		return
++	print("PASS: phase3 07_navigation_graph")
++	quit(0)
++
++func _one_way_network() -> RoadNetwork:
++	var network := RoadNetwork.new()
++	for spec in [[&"junction.ow.a", Vector3.ZERO], [&"junction.ow.b", Vector3(0, 0, -100)]]:
++		var junction := RoadJunction.new()
++		junction.id = spec[0]
++		junction.position = spec[1]
++		assert(network.add_junction(junction) == OK)
++	var segment := RoadSegment.new()
++	segment.id = &"road.oneway"
++	segment.start_junction_id = &"junction.ow.a"
++	segment.end_junction_id = &"junction.ow.b"
++	segment.profile_id = &"service"
++	segment.travel_direction_policy = &"forward_only"
++	segment.centerline = Curve3D.new()
++	segment.centerline.add_point(Vector3.ZERO)
++	segment.centerline.add_point(Vector3(0, 0, -100))
++	assert(network.add_segment(segment) == OK)
++	return network
+diff --git a/tests/phase3/test_08_navigation_routes.gd b/tests/phase3/test_08_navigation_routes.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..270a4dde7af46ea634a90862aae6b28b9394bb7b
+--- /dev/null
++++ b/tests/phase3/test_08_navigation_routes.gd
+@@ -0,0 +1,53 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var builder_script = load("res://src/world/navigation/navigation_graph_builder.gd")
++	var service_script = load("res://src/world/navigation/navigation_service.gd")
++	if builder_script == null or service_script == null:
++		fail("navigation builder/service scripts must exist")
++		return
++	var region := DrivingRegionFactory.create()
++	var graph = builder_script.new().build(region.base_definition.road_network)
++	var service = service_script.new(graph)
++	var route: Array[StringName] = service.find_route(&"junction.highway.ne", &"junction.hill.2")
++	if route.is_empty():
++		fail("highway -> rural -> hill route must be connected in Phase 3")
++		return
++	var segment_ids: Array[StringName] = service.route_segment_ids(route)
++	if &"road.connector.highway_rural" not in segment_ids:
++		fail("cross-region route must use the deliberate highway/rural connector")
++		return
++	if &"road.hill.climb_b" not in segment_ids:
++		fail("hill destination route must reach the hill branch")
++		return
++	var nearest: StringName = service.nearest_edge(Vector3(140, 0, 70))
++	if nearest.is_empty():
++		fail("nearest-edge lookup must resolve near service area")
++		return
++	var one_way_graph = _one_way_graph(builder_script)
++	var one_way_service = service_script.new(one_way_graph)
++	if not one_way_service.find_route(&"junction.ow.a", &"junction.ow.b").size() == 1:
++		fail("forward traversal on one-way road must route")
++		return
++	if not one_way_service.find_route(&"junction.ow.b", &"junction.ow.a").is_empty():
++		fail("reverse traversal on forward-only road must reject")
++		return
++	var repeat: Array[StringName] = service.find_route(&"junction.highway.ne", &"junction.hill.2")
++	if repeat != route:
++		fail("route search must be deterministic")
++		return
++	print("PASS: phase3 08_navigation_routes")
++	quit(0)
++
++func _one_way_graph(builder_script):
++	var network := RoadNetwork.new()
++	var a := RoadJunction.new(); a.id = &"junction.ow.a"; a.position = Vector3.ZERO
++	var b := RoadJunction.new(); b.id = &"junction.ow.b"; b.position = Vector3(0, 0, -100)
++	assert(network.add_junction(a) == OK); assert(network.add_junction(b) == OK)
++	var s := RoadSegment.new(); s.id = &"road.oneway"; s.start_junction_id = a.id; s.end_junction_id = b.id; s.profile_id = &"service"; s.travel_direction_policy = &"forward_only"; s.centerline = Curve3D.new(); s.centerline.add_point(a.position); s.centerline.add_point(b.position)
++	assert(network.add_segment(s) == OK)
++	return builder_script.new().build(network)
+diff --git a/tests/phase3/test_09_traffic_lane_graph.gd b/tests/phase3/test_09_traffic_lane_graph.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..4780e5de307833518c5c1a389e45124a33973f31
+--- /dev/null
++++ b/tests/phase3/test_09_traffic_lane_graph.gd
+@@ -0,0 +1,55 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var builder_script = load("res://src/traffic/traffic_lane_graph_builder.gd")
++	if builder_script == null:
++		fail("TrafficLaneGraphBuilder script must exist")
++		return
++	var region := DrivingRegionFactory.create()
++	var graph = builder_script.new().build(region.base_definition.road_network, region.base_definition.grid)
++	if graph == null:
++		fail("traffic lane graph must build")
++		return
++	var highway: Array = graph.lanes_for_road(&"road.highway.north")
++	if highway.size() != 4:
++		fail("four-lane highway must derive four traffic lanes")
++		return
++	var rural: Array = graph.lanes_for_road(&"road.rural.01")
++	if rural.size() != 2:
++		fail("two-lane rural road must derive two traffic lanes")
++		return
++	var forward := 0
++	var reverse := 0
++	for lane in rural:
++		if lane.direction == &"forward": forward += 1
++		if lane.direction == &"reverse": reverse += 1
++		if lane.speed_limit_kph != 90.0 or lane.source_road_segment_id != &"road.rural.01":
++			fail("lane must inherit source road speed/identity")
++			return
++		if lane.cell_ids.is_empty():
++			fail("traffic lane must publish cell o
