@@ -27,20 +27,40 @@ function Resolve-GodotExecutable {
 
 $Godot = Resolve-GodotExecutable
 
+function Format-ProcessArgument {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    if ($Value -notmatch '[\s"]') { return $Value }
+    return '"' + ($Value -replace '([\\]*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+}
+
 function Invoke-GodotChecked {
     param(
         [Parameter(Mandatory = $true)][string]$Label,
         [Parameter(Mandatory = $true)][string[]]$Arguments
     )
-    $Output = & $Godot @Arguments 2>&1
-    $ExitCode = $LASTEXITCODE
-    $Output | ForEach-Object { Write-Host $_ }
-    if ($ExitCode -ne 0) { throw "$Label failed with exit code $ExitCode." }
-    $FailurePattern = 'SCRIPT ERROR|ERROR: FAIL|ObjectDB instances were leaked|resources? still in use at exit'
-    if (($Output | Out-String) -match $FailurePattern) {
-        throw "$Label reported a script error, failed assertion, or leaked Godot object/resource."
+
+    $StdoutPath = [System.IO.Path]::GetTempFileName()
+    $StderrPath = [System.IO.Path]::GetTempFileName()
+    try {
+        $ProcessArguments = @($Arguments | ForEach-Object { Format-ProcessArgument -Value $_ })
+        $Process = Start-Process -FilePath $Godot -ArgumentList $ProcessArguments `
+            -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
+        $Stdout = if (Test-Path $StdoutPath) { Get-Content -Path $StdoutPath -Raw } else { "" }
+        $Stderr = if (Test-Path $StderrPath) { Get-Content -Path $StderrPath -Raw } else { "" }
+        if ($Stdout) { Write-Host $Stdout.TrimEnd() }
+        if ($Stderr) { Write-Host $Stderr.TrimEnd() }
+        $OutputText = ($Stdout + [Environment]::NewLine + $Stderr)
+        if ($Process.ExitCode -ne 0) { throw "$Label failed with exit code $($Process.ExitCode)." }
+        $FailurePattern = 'SCRIPT ERROR|ERROR: FAIL|ObjectDB instances were leaked|resources? still in use at exit'
+        if ($OutputText -match $FailurePattern) {
+            throw "$Label reported a script error, failed assertion, or leaked Godot object/resource."
+        }
+        return $OutputText
     }
-    return $Output
+    finally {
+        Remove-Item -Path $StdoutPath, $StderrPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Invoke-TickProbe {
@@ -49,8 +69,7 @@ function Invoke-TickProbe {
         "--headless", "--fixed-fps", "$Ticks", "--path", $ProjectRoot,
         "--script", "res://tests/phase1/test_41_tick_rate_probe.gd", "--", "--ticks=$Ticks"
     )
-    $Text = ($Output | Out-String)
-    $Match = [regex]::Match($Text, "TICK_RESULT ticks=$Ticks speed=([0-9.]+)")
+    $Match = [regex]::Match($Output, "TICK_RESULT ticks=$Ticks speed=([0-9.]+)")
     if (-not $Match.Success) { throw "Tick-rate probe $Ticks Hz did not report speed." }
     return [double]$Match.Groups[1].Value
 }
