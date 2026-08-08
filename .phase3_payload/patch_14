@@ -1,0 +1,166 @@
+wnership")
++			return
++	if forward != 1 or reverse != 1:
++		fail("rural road must have one lane per travel direction")
++		return
++	if rural[0].id == rural[1].id or is_equal_approx(rural[0].lateral_offset_m, rural[1].lateral_offset_m):
++		fail("lane IDs/offsets must distinguish opposite travel lanes")
++		return
++	var dirt: Array = graph.lanes_for_road(&"road.dirt.cutthrough")
++	if dirt.is_empty():
++		fail("dirt lane metadata should exist for future uses")
++		return
++	for lane in dirt:
++		if lane.civilian_enabled:
++			fail("dirt trail must disable civilian traffic by default")
++			return
++	var repeat = builder_script.new().build(region.base_definition.road_network, region.base_definition.grid)
++	if graph.fingerprint() != repeat.fingerprint():
++		fail("traffic lane derivation must be deterministic")
++		return
++	print("PASS: phase3 09_traffic_lane_graph")
++	quit(0)
+diff --git a/tests/phase3/test_10_traffic_connectors.gd b/tests/phase3/test_10_traffic_connectors.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1464402c7ca6d6173cd71f0e6f0270ec07b1726
+--- /dev/null
++++ b/tests/phase3/test_10_traffic_connectors.gd
+@@ -0,0 +1,44 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var builder_script = load("res://src/traffic/traffic_lane_graph_builder.gd")
++	var connector_script = load("res://src/traffic/traffic_lane_connector.gd")
++	if builder_script == null or connector_script == null:
++		fail("traffic connector scripts must exist")
++		return
++	var region := DrivingRegionFactory.create()
++	var graph = builder_script.new().build(region.base_definition.road_network, region.base_definition.grid)
++	var errors: PackedStringArray = graph.validation_errors()
++	if not errors.is_empty():
++		fail("canonical traffic lane graph invalid: %s" % errors)
++		return
++	var connectors: Array = graph.connectors_for_junction(&"junction.rural.1")
++	if connectors.is_empty():
++		fail("multi-road rural junction must derive traffic connectors")
++		return
++	for connector in connectors:
++		var incoming = graph.get_lane(connector.from_lane_id)
++		var outgoing = graph.get_lane(connector.to_lane_id)
++		if incoming == null or outgoing == null:
++			fail("connector lane references must resolve")
++			return
++		if incoming.end_junction_id != connector.junction_id or outgoing.start_junction_id != connector.junction_id:
++			fail("connector must preserve legal travel direction through junction")
++			return
++		if incoming.source_road_segment_id == outgoing.source_road_segment_id:
++			fail("Phase 3 connector generation must not create automatic U-turns")
++			return
++	var dangling = connector_script.new()
++	dangling.id = &"traffic.connector.dangling"
++	dangling.from_lane_id = &"traffic.missing.a"
++	dangling.to_lane_id = &"traffic.missing.b"
++	dangling.junction_id = &"junction.rural.1"
++	if graph.add_connector(dangling) != ERR_DOES_NOT_EXIST:
++		fail("dangling connector references must reject")
++		return
++	print("PASS: phase3 10_traffic_connectors")
++	quit(0)
+diff --git a/tests/phase3/test_11_traffic_simulation_policy.gd b/tests/phase3/test_11_traffic_simulation_policy.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..402fabc315c43daf2539bc1e267f2aeba8f3234e
+--- /dev/null
++++ b/tests/phase3/test_11_traffic_simulation_policy.gd
+@@ -0,0 +1,24 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var policy_script = load("res://src/traffic/traffic_simulation_policy.gd")
++	if policy_script == null:
++		fail("TrafficSimulationPolicy script must exist")
++		return
++	var policy = policy_script.new()
++	if policy.level_for(&"traffic.a", 50.0) != &"near": fail("50m traffic must be near"); return
++	if policy.level_for(&"traffic.a", 250.0) != &"mid": fail("250m traffic must be mid"); return
++	if policy.level_for(&"traffic.a", 700.0) != &"far": fail("700m traffic must be far"); return
++	if policy.level_for(&"traffic.a", 130.0, &"near") != &"near": fail("near hysteresis must retain agent at 130m"); return
++	if policy.level_for(&"traffic.a", 130.0) != &"mid": fail("fresh 130m agent should enter mid, not near"); return
++	if policy.level_for(&"traffic.a", 470.0, &"mid") != &"mid": fail("mid hysteresis must retain agent at 470m"); return
++	if policy.level_for(&"traffic.a", 470.0) != &"far": fail("fresh 470m agent should enter far"); return
++	for distance in [0.0, 100.0, 1000.0]:
++		if policy.level_for(&"player", distance, &"far") != &"player": fail("player must never enter traffic simulation LOD"); return
++	if not policy.validation_errors().is_empty(): fail("default simulation policy must validate"); return
++	print("PASS: phase3 11_traffic_simulation_policy")
++	quit(0)
+diff --git a/tests/phase3/test_12_traffic_agent.gd b/tests/phase3/test_12_traffic_agent.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..b338c717ee39e2059cade8fa398d19bcb9325922
+--- /dev/null
++++ b/tests/phase3/test_12_traffic_agent.gd
+@@ -0,0 +1,57 @@
++extends SceneTree
++
++func fail(message: String) -> void:
++	push_error("FAIL: " + message)
++	quit(1)
++
++func _init() -> void:
++	var agent_script = load("res://src/traffic/traffic_agent.gd")
++	var definition_script = load("res://src/traffic/traffic_vehicle_definition.gd")
++	if agent_script == null or definition_script == null:
++		fail("traffic agent/definition scripts must exist")
++		return
++	var lane := _lane()
++	var definition = definition_script.new()
++	definition.id = &"traffic.vehicle.test"
++	var agent = agent_script.new()
++	var errors: PackedStringArray = agent.configure(definition, lane)
++	if not errors.is_empty(): fail("valid traffic agent config rejected: %s" % errors); agent.free(); return
++	if agent is VehicleController: fail("civilian traffic must not instantiate the player VehicleController"); agent.free(); return
++	agent.position = Vector3.ZERO
++	agent.linear_velocity = Vector3.ZERO
++	var launch: Dictionary = agent.compute_control_state(0.1, INF, false)
++	if float(launch.throttle) < 0.5 or float(launch.brake) > 0.01: fail("stopped traffic should accelerate toward lane speed"); agent.free(); return
++	agent.linear_velocity = Vector3(0, 0, -18)
++	var following: Dictionary = agent.compute_control_state(0.1, 6.0, false)
++	if float(following.brake) <= 0.1: fail("traffic must brake when following gap is unsafe"); agent.free(); return
++	var blocked: Dictionary = agent.compute_control_state(0.1, INF, true)
++	if float(blocked.brake) < 0.99 or float(blocked.throttle) > 0.01: fail("blocked lane must command full brake"); agent.free(); return
++	agent.position = Vector3(55, 0, -20)
++	var recovery := false
++	for _i in range(4):
++		var state: Dictionary = agent.compute_control_state(1.0, INF, false)
++		recovery = recovery or bool(state.recovery_requested)
++	if not recovery: fail("sustained large lane divergence must request recovery"); agent.free(); return
++	agent.set_simulation_level(&"mid")
++	if not agent.freeze or not agent.visible: fail("mid traffic must be frozen/simplified but visible"); agent.free(); return
++	agent.set_simulation_level(&"far")
++	if not agent.freeze or agent.visible: fail("far traffic body must be frozen and hidden") ; agent.free(); return
++	agent.set_simulation_level(&"near")
++	if agent.freeze or not agent.visible: fail("near traffic must return to dynamic visible body"); agent.free(); return
++	agent.free()
++	print("PASS: phase3 12_traffic_agent")
++	quit(0)
++
++func _lane() -> TrafficLane:
++	var lane := TrafficLane.new()
++	lane.id = &"traffic.road.test.f0"
++	lane.source_road_segment_id = &"road.test"
++	lane.direction = &"forward"
++	lane.lateral_offset_m = 1.7
++	lane.lane_width_m = 3.4
++	lane.speed_limit_kph = 72.0
++	lane.start_junction_id = &"junction.a"
++	lane.end_junction_id = &"junction.b"
++	lane.sampled_positions = PackedVector3Array([Vector3(0,0,0), Vector3(0,0,-100), Vector3(0,0,-200)])
++	lane.cell_ids = [&"world.proving.cp00_p00"]
++	return lane
+diff --git a/t
