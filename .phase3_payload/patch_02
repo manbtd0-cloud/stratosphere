@@ -1,0 +1,172 @@
+ength := a.distance_to(b)
++		if remaining <= length:
++			var t := remaining / maxf(length, 0.001)
++			var direction := (b - a).normalized()
++			position = a.lerp(b, t)
++			basis = Basis.looking_at(direction, Vector3.UP)
++			return
++		remaining -= length
+diff --git a/src/traffic/traffic_lane.gd b/src/traffic/traffic_lane.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..471422b59d685f211fb9a00650ae3c33556dc194
+--- /dev/null
++++ b/src/traffic/traffic_lane.gd
+@@ -0,0 +1,27 @@
++class_name TrafficLane
++extends Resource
++
++@export var id: StringName = &""
++@export var source_road_segment_id: StringName = &""
++@export var direction: StringName = &"forward"
++@export var lateral_offset_m: float = 0.0
++@export var lane_width_m: float = 3.4
++@export var speed_limit_kph: float = 50.0
++@export var start_junction_id: StringName = &""
++@export var end_junction_id: StringName = &""
++@export var sampled_positions: PackedVector3Array = PackedVector3Array()
++@export var cell_ids: Array[StringName] = []
++@export var civilian_enabled: bool = true
++
++func validation_errors() -> PackedStringArray:
++	var errors := PackedStringArray()
++	if id.is_empty(): errors.append("traffic lane id must not be empty")
++	if source_road_segment_id.is_empty(): errors.append("traffic lane source road id must not be empty")
++	if direction not in [&"forward", &"reverse"]: errors.append("unsupported traffic lane direction: %s" % direction)
++	if lane_width_m <= 0.0: errors.append("traffic lane width must be positive")
++	if speed_limit_kph <= 0.0: errors.append("traffic lane speed must be positive")
++	if start_junction_id.is_empty() or end_junction_id.is_empty(): errors.append("traffic lane junction IDs must not be empty")
++	if start_junction_id == end_junction_id: errors.append("traffic lane junction IDs must differ")
++	if sampled_positions.size() < 2: errors.append("traffic lane requires at least two sampled positions")
++	if cell_ids.is_empty(): errors.append("traffic lane must publish cell ownership")
++	return errors
+diff --git a/src/traffic/traffic_lane_connector.gd b/src/traffic/traffic_lane_connector.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..e7f54df7667d3ec0b5f4dcbf75f905d8bc53a961
+--- /dev/null
++++ b/src/traffic/traffic_lane_connector.gd
+@@ -0,0 +1,15 @@
++class_name TrafficLaneConnector
++extends Resource
++
++@export var id: StringName = &""
++@export var from_lane_id: StringName = &""
++@export var to_lane_id: StringName = &""
++@export var junction_id: StringName = &""
++
++func validation_errors() -> PackedStringArray:
++	var errors := PackedStringArray()
++	if id.is_empty(): errors.append("traffic connector id must not be empty")
++	if from_lane_id.is_empty() or to_lane_id.is_empty(): errors.append("traffic connector lane IDs must not be empty")
++	if from_lane_id == to_lane_id: errors.append("traffic connector lanes must differ")
++	if junction_id.is_empty(): errors.append("traffic connector junction ID must not be empty")
++	return errors
+diff --git a/src/traffic/traffic_lane_graph.gd b/src/traffic/traffic_lane_graph.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..164baf07a448aea218a22dd457fc05d8b0fc970d
+--- /dev/null
++++ b/src/traffic/traffic_lane_graph.gd
+@@ -0,0 +1,94 @@
++class_name TrafficLaneGraph
++extends RefCounted
++
++var _lanes: Dictionary = {}
++var _connectors: Dictionary = {}
++
++func add_lane(lane: TrafficLane) -> Error:
++	if lane == null or not lane.validation_errors().is_empty(): return ERR_INVALID_DATA
++	if _lanes.has(lane.id): return ERR_ALREADY_EXISTS
++	_lanes[lane.id] = lane
++	return OK
++
++func add_connector(connector: TrafficLaneConnector) -> Error:
++	if connector == null or not connector.validation_errors().is_empty(): return ERR_INVALID_DATA
++	if _connectors.has(connector.id): return ERR_ALREADY_EXISTS
++	if not _lanes.has(connector.from_lane_id) or not _lanes.has(connector.to_lane_id): return ERR_DOES_NOT_EXIST
++	var incoming: TrafficLane = _lanes[connector.from_lane_id]
++	var outgoing: TrafficLane = _lanes[connector.to_lane_id]
++	if incoming.end_junction_id != connector.junction_id or outgoing.start_junction_id != connector.junction_id:
++		return ERR_INVALID_DATA
++	_connectors[connector.id] = connector
++	return OK
++
++func get_lane(lane_id: StringName) -> TrafficLane:
++	return _lanes.get(lane_id) as TrafficLane
++
++func get_connector(connector_id: StringName) -> TrafficLaneConnector:
++	return _connectors.get(connector_id) as TrafficLaneConnector
++
++func lane_ids() -> Array[StringName]:
++	var result: Array[StringName] = []
++	for lane_id in _lanes.keys(): result.append(lane_id)
++	result.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
++	return result
++
++func connector_ids() -> Array[StringName]:
++	var result: Array[StringName] = []
++	for connector_id in _connectors.keys(): result.append(connector_id)
++	result.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
++	return result
++
++func lanes_for_road(road_id: StringName) -> Array[TrafficLane]:
++	var result: Array[TrafficLane] = []
++	for lane_id in lane_ids():
++		var lane := get_lane(lane_id)
++		if lane.source_road_segment_id == road_id: result.append(lane)
++	return result
++
++func connectors_for_junction(junction_id: StringName) -> Array[TrafficLaneConnector]:
++	var result: Array[TrafficLaneConnector] = []
++	for connector_id in connector_ids():
++		var connector := get_connector(connector_id)
++		if connector.junction_id == junction_id: result.append(connector)
++	return result
++
++func incoming_lanes(junction_id: StringName, civilian_only: bool = false) -> Array[TrafficLane]:
++	var result: Array[TrafficLane] = []
++	for lane_id in lane_ids():
++		var lane := get_lane(lane_id)
++		if lane.end_junction_id == junction_id and (not civilian_only or lane.civilian_enabled): result.append(lane)
++	return result
++
++func outgoing_lanes(junction_id: StringName, civilian_only: bool = false) -> Array[TrafficLane]:
++	var result: Array[TrafficLane] = []
++	for lane_id in lane_ids():
++		var lane := get_lane(lane_id)
++		if lane.start_junction_id == junction_id and (not civilian_only or lane.civilian_enabled): result.append(lane)
++	return result
++
++func validation_errors() -> PackedStringArray:
++	var errors := PackedStringArray()
++	for lane_id in lane_ids():
++		for error in get_lane(lane_id).validation_errors(): errors.append("%s: %s" % [lane_id, error])
++	for connector_id in connector_ids():
++		var connector := get_connector(connector_id)
++		for error in connector.validation_errors(): errors.append("%s: %s" % [connector_id, error])
++		if not _lanes.has(connector.from_lane_id) or not _lanes.has(connector.to_lane_id):
++			errors.append("%s references missing traffic lane" % connector_id)
++			continue
++		var incoming := get_lane(connector.from_lane_id)
++		var outgoing := get_lane(connector.to_lane_id)
++		if incoming.end_junction_id != connector.junction_id or outgoing.start_junction_id != connector.junction_id:
++			errors.append("%s violates junction travel direction" % connector_id)
++	return errors
++
++func fingerprint() -> String:
++	var text := ""
++	for lane_id in lane_ids():
++		var lane := get_lane(lane_id)
++		text += "%s|%s|%s|%.3f|%.3f|%s|%s|%s|%s;" % [lane.id, lane.source_road_segment_id, lane.direction, lane.lateral_offset_m, lane.speed_limit_kph, lane.start_junction_id, lane.end_junction_id, lane.civilian_enabled, lane.cell_ids]
++	for connector_id in connector_ids():
++		var connector := get_connector(connector_id)
++		text += "%s>%s>%s@%s;" % [connector.id, connector.from_lane_id, connector.to_lane_id, connector.junction_id]
++	return text.sha256_text()
+diff --git a/src/traffic/traffic_lane_graph_builder.gd b/src/traffic/traffic_lane_graph_builder.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..c8b6d860cfa59bedc3c0177beb5e2dbb8e67f392
+--- /dev/null
++++ b/src/traffic/traffic_lane_graph_builder.gd
+@@ -0,0 +1,83 @@
++class_name TrafficLaneGraphBuilder
++extends RefCounted
++
++var _sampler := R
