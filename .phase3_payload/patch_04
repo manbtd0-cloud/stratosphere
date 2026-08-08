@@ -1,0 +1,200 @@
+ds():
++		var cell_id: StringName = _cell_by_id.get(traffic_id, &"")
++		if not loaded.has(cell_id): to_remove.append(traffic_id)
++	for traffic_id in to_remove: _remove_agent(traffic_id)
++
++func update_simulation_levels(player_position: Vector3) -> void:
++	for traffic_id in active_ids():
++		var agent := agent_for_id(traffic_id)
++		if agent == null: continue
++		var distance := agent.position.distance_to(player_position)
++		agent.set_simulation_level(_policy.level_for(traffic_id, distance, agent.simulation_level))
++
++func active_count() -> int:
++	return _agents.size()
++
++func active_ids() -> PackedStringArray:
++	var result := PackedStringArray()
++	for traffic_id in _agents.keys(): result.append(String(traffic_id))
++	result.sort()
++	return result
++
++func agent_for_id(traffic_id: StringName) -> TrafficAgent:
++	return _agents.get(traffic_id) as TrafficAgent
++
++func cell_for_agent(traffic_id: StringName) -> StringName:
++	return _cell_by_id.get(traffic_id, &"")
++
++func clear_all() -> void:
++	var ids: Array[StringName] = []
++	for raw_id in _agents.keys(): ids.append(raw_id)
++	for traffic_id in ids: _remove_agent(traffic_id)
++	_agents.clear()
++	_cell_by_id.clear()
++
++func _remove_agent(traffic_id: StringName) -> void:
++	if not _agents.has(traffic_id): return
++	var agent := _agents[traffic_id] as TrafficAgent
++	_agents.erase(traffic_id)
++	_cell_by_id.erase(traffic_id)
++	if agent != null and is_instance_valid(agent):
++		if agent.is_inside_tree(): agent.queue_free()
++		else: agent.free()
++
++func _attach_development_body(agent: TrafficAgent, definition: TrafficVehicleDefinition) -> void:
++	var shape := BoxShape3D.new()
++	shape.size = definition.dimensions_m
++	var collision := CollisionShape3D.new()
++	collision.name = "CollisionShape3D"
++	collision.shape = shape
++	agent.add_child(collision)
++	var mesh := BoxMesh.new()
++	mesh.size = definition.dimensions_m
++	var material := StandardMaterial3D.new()
++	var hue_seed := float(abs(String(definition.id).hash()) % 1000) / 1000.0
++	material.albedo_color = Color.from_hsv(hue_seed, 0.38, 0.62)
++	material.roughness = 0.48
++	mesh.material = material
++	var visual := MeshInstance3D.new()
++	visual.name = "DevelopmentBody"
++	visual.mesh = mesh
++	agent.add_child(visual)
+diff --git a/src/traffic/traffic_roster_factory.gd b/src/traffic/traffic_roster_factory.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..a113b35cf76ff0dcb261bcfd985c0457be51f752
+--- /dev/null
++++ b/src/traffic/traffic_roster_factory.gd
+@@ -0,0 +1,53 @@
++class_name TrafficRosterFactory
++extends RefCounted
++
++const PACK_ONE_URL := "https://www.fab.com/listings/dc1ada50-2523-44b1-b0e2-a72d14076fb4"
++const PACK_TWO_URL := "https://www.fab.com/listings/591e3b3f-9d49-4cd2-8e28-d471c1a10cab"
++const DEVELOPMENT_PATHS := [
++	"res://assets/traffic/development/compact.tres",
++	"res://assets/traffic/development/sedan.tres",
++	"res://assets/traffic/development/crossover.tres",
++	"res://assets/traffic/development/utility.tres",
++	"res://assets/traffic/development/van.tres",
++]
++
++static func create_development_roster() -> Array[TrafficVehicleDefinition]:
++	var result: Array[TrafficVehicleDefinition] = []
++	for path in DEVELOPMENT_PATHS:
++		var definition := load(path) as TrafficVehicleDefinition
++		if definition != null:
++			result.append(definition.duplicate(true) as TrafficVehicleDefinition)
++	return result
++
++static func asset_records() -> Array[AssetRecord]:
++	var result: Array[AssetRecord] = []
++	for path in DEVELOPMENT_PATHS:
++		var definition := load(path) as TrafficVehicleDefinition
++		if definition == null:
++			continue
++		var record := AssetRecord.new()
++		record.id = definition.id
++		record.kind = &"vehicle_traffic"
++		record.source = "internal://phase3/procedural-traffic-standin"
++		record.license_status = &"internal_development"
++		record.runtime_path = path
++		record.scale_meters = 1.0
++		record.forward_axis = &"-Z"
++		record.up_axis = &"+Y"
++		record.triangle_count = 12
++		record.material_count = 1
++		record.max_texture_resolution = 0
++		record.collision_status = &"box_proxy"
++		record.lod_count = 3
++		record.shadow_mesh_ready = true
++		record.rig_status = &"not_required"
++		record.cockpit_suitability = &"not_applicable"
++		record.runtime_status = &"development"
++		record.cleanup_notes = _candidate_note(definition.id)
++		result.append(record)
++	return result
++
++static func _candidate_note(definition_id: StringName) -> String:
++	if definition_id in [&"traffic.vehicle.compact", &"traffic.vehicle.crossover", &"traffic.vehicle.utility"]:
++		return "Procedural Phase 3 stand-in. Production candidate: Fab Vehicle Variety Pack (free; Unreal package; conversion required): %s" % PACK_ONE_URL
++	return "Procedural Phase 3 stand-in. Production candidate: Fab Vehicle Variety Pack Volume 2 (free; Unreal package; conversion required): %s" % PACK_TWO_URL
+diff --git a/src/traffic/traffic_simulation_policy.gd b/src/traffic/traffic_simulation_policy.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..ef6dc31952882b83eff27e9f5aa0825a8acc6a6b
+--- /dev/null
++++ b/src/traffic/traffic_simulation_policy.gd
+@@ -0,0 +1,36 @@
++class_name TrafficSimulationPolicy
++extends Resource
++
++@export var near_enter_m: float = 120.0
++@export var near_exit_m: float = 145.0
++@export var mid_enter_m: float = 450.0
++@export var mid_exit_m: float = 500.0
++
++func level_for(entity_id: StringName, distance_m: float, previous_level: StringName = &"") -> StringName:
++	if entity_id == &"player":
++		return &"player"
++	var distance := maxf(distance_m, 0.0)
++	match previous_level:
++		&"near":
++			if distance <= near_exit_m: return &"near"
++			if distance <= mid_enter_m: return &"mid"
++			return &"far"
++		&"mid":
++			if distance < near_enter_m: return &"near"
++			if distance <= mid_exit_m: return &"mid"
++			return &"far"
++		&"far":
++			if distance < near_enter_m: return &"near"
++			if distance < mid_enter_m: return &"mid"
++			return &"far"
++	if distance <= near_enter_m: return &"near"
++	if distance <= mid_enter_m: return &"mid"
++	return &"far"
++
++func validation_errors() -> PackedStringArray:
++	var errors := PackedStringArray()
++	if near_enter_m <= 0.0: errors.append("near enter distance must be positive")
++	if near_exit_m < near_enter_m: errors.append("near exit must be at least near enter")
++	if mid_enter_m <= near_exit_m: errors.append("mid enter must exceed near exit")
++	if mid_exit_m < mid_enter_m: errors.append("mid exit must be at least mid enter")
++	return errors
+diff --git a/src/traffic/traffic_spawn_candidate.gd b/src/traffic/traffic_spawn_candidate.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..07da061229e5a6eb5678f2658840eb5181d142e7
+--- /dev/null
++++ b/src/traffic/traffic_spawn_candidate.gd
+@@ -0,0 +1,12 @@
++class_name TrafficSpawnCandidate
++extends RefCounted
++
++var lane_id: StringName = &""
++var position: Vector3 = Vector3.ZERO
++var forward: Vector3 = Vector3.FORWARD
++var cell_id: StringName = &""
++var sample_index: int = 0
++var distance_to_player_m: float = 0.0
++
++func fingerprint() -> String:
++	return "%s|%d|%.3f,%.3f,%.3f|%s" % [lane_id, sample_index, position.x, position.y, position.z, cell_id]
+diff --git a/src/traffic/traffic_spawner.gd b/src/traffic/traffic_spawner.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..cfc8c091dc4ceae1ef3cdef1c2a9bbf1567704f9
+--- /dev/null
++++ b/src/traffic/traffic_spawner.gd
+@@ -0,0 +1,75 @@
++class_name TrafficSpawner
++extends RefCounted
++
++@export var min_player_distance_m: float = 70.0
++@export var max_spawn_distance_m: float = 480.0
++@export var close_view_distance_m: float = 220.0
++@export var view_cone_dot_threshold: float = 0.35
++@export var occupied_clearance_m: float = 14.0
++@export var preferred_spawn_distance_m: float = 190.0
++
++func is_candidate_safe(position: Vector3, _lane_forward: Vector3, player_transform: Transform3D, occupied_positions: Array) -> bool:
++	var to_candidate := position - player_transform.origin
++	var distance := to_candidate.length()
++	if distance < m
