@@ -1,0 +1,48 @@
+name: Phase 1 Closure
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux Godot 4.7.1 full gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tools/godot
+          curl -L --fail --retry 3 -o .tools/godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q .tools/godot.zip -d .tools/godot
+          chmod +x .tools/godot/Godot_v4.7.1-stable_linux.x86_64
+      - name: Verify exact repository
+        shell: bash
+        env:
+          GODOT_BIN: ${{ github.workspace }}/.tools/godot/Godot_v4.7.1-stable_linux.x86_64
+        run: ./tools/verify/verify.sh
+
+  windows:
+    name: Windows Godot 4.7.1 full gate
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.1
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path .tools\godot | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_win64.exe.zip" -OutFile .tools\godot.zip
+          Expand-Archive -Path .tools\godot.zip -DestinationPath .tools\godot -Force
+      - name: Verify exact repository
+        shell: powershell
+        run: |
+          $env:GODOT_BIN = Join-Path $env:GITHUB_WORKSPACE ".tools\godot\Godot_v4.7.1-stable_win64.exe"
+          powershell -ExecutionPolicy Bypass -File .\tools\verify\verify.ps1
