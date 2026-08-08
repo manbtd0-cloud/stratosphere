@@ -1,0 +1,43 @@
+name: Phase 2 Sandbox Bootstrap
+
+on:
+  push:
+    branches:
+      - agent/phase-2-road-world-foundation
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Download Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .phase2-bootstrap/godot
+          curl -L --fail --retry 3 -o .phase2-bootstrap/godot.zip \
+            https://github.com/godotengine/godot-builds/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q .phase2-bootstrap/godot.zip -d .phase2-bootstrap/godot
+          chmod +x .phase2-bootstrap/godot/Godot_v4.7.1-stable_linux.x86_64
+          .phase2-bootstrap/godot/Godot_v4.7.1-stable_linux.x86_64 --version
+      - name: Package exact source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git --exclude=.phase2-bootstrap -czf .phase2-bootstrap/repo-snapshot.tar.gz .
+      - name: Upload sandbox bootstrap
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-sandbox-bootstrap
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          path: |
+            .phase2-bootstrap/godot/Godot_v4.7.1-stable_linux.x86_64
+            .phase2-bootstrap/repo-snapshot.tar.gz
