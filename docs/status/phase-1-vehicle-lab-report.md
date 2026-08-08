@@ -1,6 +1,6 @@
 # Phase 1 Vehicle Laboratory Status
 
-**Date:** 2026-08-07  
+**Date:** 2026-08-08  
 **Engine:** Godot 4.7.1 stable `a13da4feb`  
 **Physics:** Jolt, custom `RigidBody3D` vehicle solver  
 **Platforms:** Windows x86_64 and Linux x86_64 contracts
@@ -15,18 +15,18 @@
 - Audited 350Z runtime hierarchy with real wheel/cockpit animation, greybox fallback and automatic LOD selection at 14/32/65 m with 2.5 m hysteresis.
 - Deterministic Blender 5.2.0 runtime pipeline with four LODs, 14 PBR material families and embedded tire/carbon/decal texture detail.
 - Telemetry-only audio/effects bridges expose RPM/load/gear/surface/slip/impact/exhaust/skid/damage state without coupling presentation back into physics.
-- Runtime brake-light emission follows brake telemetry on the real `runtime_light_red` material and automatically rebinds after LOD replacement.
+- Runtime brake-light emission follows brake telemetry on the real `runtime_light_red` material and automatically rebinds after LOD replacement when local development GLBs are present; clean clones verify the greybox fallback path instead of requiring untracked binaries.
 - Reusable `VehicleAssetValidator` enforces LOD/material/texture/import/semantic/scene contracts for future cars and keeps release licensing as a separate explicit gate.
 - `VehicleTelemetryEnricher` derives suspension velocity and surface wetness per wheel plus frame/physics cadence and enrichment cost without modifying the vehicle force path.
 - `VehicleRecoveryCoordinator` maintains a last-known-safe upright/grounded reset transform and provides delayed automatic recovery only for settled inverted vehicles.
 
-## Measured Linux headless baseline
+## Measured headless baseline
 
-- 0–100 km/h: approximately 7.48 s.
-- 100–0 km/h: approximately 41.56 m after a natural acceleration run.
-- independent 60 Hz five-second launch: 20.084654 m/s.
-- independent 120 Hz five-second launch: 20.942167 m/s.
-- relative 60/120 difference: approximately 4.09%, below the 12% hard gate.
+- 0–100 km/h: approximately 7.48 s in the established Phase 1 Linux handling baseline.
+- 100–0 km/h: approximately 41.56 m after a natural acceleration run in the established Phase 1 Linux handling baseline.
+- closure-matrix 60 Hz five-second launch: 21.002768 m/s.
+- closure-matrix 120 Hz five-second launch: 21.683588 m/s.
+- closure-matrix relative 60/120 difference: 3.14%, below the 12% hard gate.
 
 ## Starter-car asset pipeline
 
@@ -45,15 +45,24 @@ Final deterministic textured development outputs:
 
 Derived GLBs remain intentionally untracked while source licensing is `unverified_for_release`; source fingerprints, deterministic generators and exact output hashes are committed so development assets are reproducible.
 
-## Verification policy
+## Cross-platform automated closure gate
 
 The shared manifest contains 67 contracts: 12 Phase 0 plus 55 Phase 1. The 350Z source contract requires matching geometry/material generator fingerprints and an audited embedded texture payload.
 
-Focused Godot 4.7.1 verification on the exact textured runtime package passed contracts 42–55 together (14/14): source metadata, runtime visual binding, controller input, camera input, automatic LOD, lab presentation, telemetry HUD, presentation bridge state, real brake-light rebinding, production bridge scene integration, reusable asset validation, telemetry enrichment, recovery decision logic and production service-node integration.
+On 2026-08-08, the exact implementation/test tree at `8251b85f308c84f91e1e18b08346a0d7a73cc48b` was checked out from GitHub and run with official Godot 4.7.1 on both hosted operating systems:
 
-## Remaining checkpoints
+- Ubuntu 24.04: **67/67 contracts passed**, project import passed, leak/error gate passed, and the independent 60/120 matrix passed at 3.14% relative difference.
+- Windows Server 2025: **67/67 contracts passed**, project import passed, leak/error gate passed, and the independent 60/120 matrix passed at the same 3.14% relative difference.
+- 60 Hz probe: 21.002768 m/s.
+- 120 Hz probe: 21.683588 m/s.
+- hard allowed difference: 12%.
 
-- Run the complete shared 67-contract repository gate on a fully reconstructed exact branch tree before Phase 1 closure.
-- Perform subjective keyboard/controller handling tuning on physical Windows/Linux hardware and record telemetry runs.
-- Run native GPU visual/performance review with the generated LOD0-L3 assets on target-class hardware.
-- Verify release-safe licensing or replace/fictionalize the source before public/commercial distribution.
+The first closure attempt exposed two verification defects and they were corrected before the successful run: the shared brake-light contract had incorrectly required intentionally untracked development GLBs, and the Windows wrapper depended on `$LASTEXITCODE` under strict mode. The successful run used the clean-clone-aware presentation contract and an explicit native-process exit-code path on Windows.
+
+This closes the automated cross-platform Phase 1 repository gate. Hosted headless runners are not evidence for subjective driving feel or target-GPU frame-time budgets.
+
+## Remaining physical/release checkpoints
+
+- Perform subjective keyboard/controller handling review on physical Windows/Linux hardware and record representative telemetry runs.
+- Run native GPU visual/performance review with LOD0–LOD3 on target-class hardware; confirm the player-vehicle physics/presentation budgets using real frame-time profiling.
+- Verify release-safe licensing or replace/fictionalize the selected source before public/commercial distribution.
