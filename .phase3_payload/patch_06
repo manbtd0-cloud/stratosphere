@@ -1,0 +1,183 @@
+, b: Dictionary) -> bool: return int(a.index) < int(b.index))
++	var multimesh := MultiMesh.new()
++	multimesh.transform_format = MultiMesh.TRANSFORM_3D
++	multimesh.mesh = mesh
++	multimesh.instance_count = desired_count
++	var instance_ids := PackedStringArray()
++	var combined_fingerprint := ""
++	for output_index in range(selected.size()):
++		var source_index: int = int(selected[output_index].index)
++		var transform: Transform3D = transforms[source_index]
++		multimesh.set_instance_transform(output_index, transform)
++		var instance_id := "%s.%s.i%04d" % [cluster_id, cell_id, source_index]
++		instance_ids.append(instance_id)
++		combined_fingerprint += "%s=%s;" % [instance_id, selected[output_index].fingerprint]
++	var instance := MultiMeshInstance3D.new()
++	instance.name = "Cluster_%s" % String(cluster_id).replace(".", "_")
++	instance.multimesh = multimesh
++	instance.set_meta("cluster_id", cluster_id)
++	instance.set_meta("cell_id", cell_id)
++	instance.set_meta("instance_ids", instance_ids)
++	instance.set_meta("transform_fingerprint", combined_fingerprint.sha256_text())
++	instance.set_meta("source_instance_count", transforms.size())
++	instance.set_meta("density_multiplier", density)
++	return instance
++
++func _transform_key(transform: Transform3D) -> String:
++	var values := [
++		transform.origin.x, transform.origin.y, transform.origin.z,
++		transform.basis.x.x, transform.basis.x.y, transform.basis.x.z,
++		transform.basis.y.x, transform.basis.y.y, transform.basis.y.z,
++		transform.basis.z.x, transform.basis.z.y, transform.basis.z.z,
++	]
++	var parts := PackedStringArray()
++	for value in values:
++		parts.append("%.4f" % snappedf(float(value), 0.0001))
++	return ",".join(parts)
+diff --git a/src/world/environment/environment_zone_definition.gd b/src/world/environment/environment_zone_definition.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..cf373b7ac5a9266bf451123108167a85b2987509
+--- /dev/null
++++ b/src/world/environment/environment_zone_definition.gd
+@@ -0,0 +1,43 @@
++class_name EnvironmentZoneDefinition
++extends Resource
++
++const ALLOWED_CLASSES: Array[StringName] = [
++	&"countryside_open", &"farmland", &"forest", &"hill_rocky",
++	&"rural_settlement", &"industrial_service", &"highway_corridor",
++	&"dirt_trail_corridor", &"scenic_overlook",
++]
++
++@export var id: StringName = &""
++@export var zone_class: StringName = &"countryside_open"
++@export var cell_ids: Array[StringName] = []
++@export var vegetation_palette_ids: Array[StringName] = []
++@export var prop_palette_ids: Array[StringName] = []
++@export var density_multiplier: float = 1.0
++@export var traffic_density_multiplier: float = 1.0
++@export var roadside_furniture_policy: StringName = &"default"
++@export var ambient_audio_hook_ids: Array[StringName] = []
++
++func validate() -> PackedStringArray:
++	var errors := PackedStringArray()
++	cell_ids = _unique(cell_ids)
++	vegetation_palette_ids = _unique(vegetation_palette_ids)
++	prop_palette_ids = _unique(prop_palette_ids)
++	ambient_audio_hook_ids = _unique(ambient_audio_hook_ids)
++	if id.is_empty():
++		errors.append("environment zone id must not be empty")
++	if zone_class not in ALLOWED_CLASSES:
++		errors.append("unsupported environment zone class: %s" % zone_class)
++	if cell_ids.is_empty():
++		errors.append("environment zone must own at least one cell")
++	if density_multiplier < 0.0:
++		errors.append("environment density multiplier must not be negative")
++	if traffic_density_multiplier < 0.0:
++		errors.append("traffic density multiplier must not be negative")
++	return errors
++
++func _unique(values: Array[StringName]) -> Array[StringName]:
++	var result: Array[StringName] = []
++	for value in values:
++		if not value.is_empty() and value not in result:
++			result.append(value)
++	return result
+diff --git a/src/world/environment/roadside_placement_builder.gd b/src/world/environment/roadside_placement_builder.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..beeafaa28984c57c3db7a29cd382ea2094fd1fdf
+--- /dev/null
++++ b/src/world/environment/roadside_placement_builder.gd
+@@ -0,0 +1,41 @@
++class_name RoadsidePlacementBuilder
++extends RefCounted
++
++var _sampler := RoadSplineSampler.new()
++
++func build_side_anchors(
++	segment: RoadSegment,
++	profile: RoadProfile,
++	spacing_m: float,
++	lateral_offset_m: float,
++	both_sides: bool = true,
++	start_margin_m: float = 8.0,
++	end_margin_m: float = 8.0
++) -> Array[Transform3D]:
++	var result: Array[Transform3D] = []
++	if segment == null or profile == null or spacing_m <= 0.0:
++		return result
++	var samples := _sampler.sample(segment, spacing_m)
++	if samples.is_empty():
++		return result
++	var total: float = samples[-1].accumulated_distance_m
++	for sample in samples:
++		if sample.accumulated_distance_m < start_margin_m or sample.accumulated_distance_m > total - end_margin_m:
++			continue
++		var basis := Basis(sample.right, sample.up, -sample.forward).orthonormalized()
++		var right_position := sample.position + sample.right * lateral_offset_m
++		result.append(Transform3D(basis, right_position))
++		if both_sides:
++			var left_basis := Basis(-sample.right, sample.up, sample.forward).orthonormalized()
++			var left_position := sample.position - sample.right * lateral_offset_m
++			result.append(Transform3D(left_basis, left_position))
++	return result
++
++func build_centerline_anchors(segment: RoadSegment, spacing_m: float) -> Array[Transform3D]:
++	var result: Array[Transform3D] = []
++	if segment == null or spacing_m <= 0.0:
++		return result
++	for sample in _sampler.sample(segment, spacing_m):
++		var basis := Basis(sample.right, sample.up, -sample.forward).orthonormalized()
++		result.append(Transform3D(basis, sample.position + sample.up * 0.025))
++	return result
+diff --git a/src/world/navigation/navigation_edge.gd b/src/world/navigation/navigation_edge.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..546e31ad18c13f6cb5095e6fc48f40202ebd32f5
+--- /dev/null
++++ b/src/world/navigation/navigation_edge.gd
+@@ -0,0 +1,19 @@
++class_name NavigationEdge
++extends Resource
++
++@export var id: StringName = &""
++@export var from_node_id: StringName = &""
++@export var to_node_id: StringName = &""
++@export var road_segment_id: StringName = &""
++@export var cost_m: float = 0.0
++@export var sampled_positions: PackedVector3Array = PackedVector3Array()
++
++func validation_errors() -> PackedStringArray:
++	var errors := PackedStringArray()
++	if id.is_empty(): errors.append("navigation edge id must not be empty")
++	if from_node_id.is_empty() or to_node_id.is_empty(): errors.append("navigation edge endpoints must not be empty")
++	if from_node_id == to_node_id: errors.append("navigation edge endpoints must differ")
++	if road_segment_id.is_empty(): errors.append("navigation edge road segment id must not be empty")
++	if cost_m <= 0.0: errors.append("navigation edge cost must be positive")
++	if sampled_positions.size() < 2: errors.append("navigation edge requires at least two sampled positions")
++	return errors
+diff --git a/src/world/navigation/navigation_graph.gd b/src/world/navigation/navigation_graph.gd
+new file mode 100644
+index 0000000000000000000000000000000000000000..c55fd567e7329e2607c96fe7a5be3e863755f78a
+--- /dev/null
++++ b/src/world/navigation/navigation_graph.gd
+@@ -0,0 +1,59 @@
++class_name NavigationGraph
++extends RefCounted
++
++var _nodes: Dictionary = {}
++var _edges: Dictionary = {}
++var _outgoing: Dictionary = {}
++
++func add_node(node_id: StringName, position: Vector3) -> Error:
++	if node_id.is_empty() or not position.is_finite(): return ERR_INVALID_PARAMETER
++	if _nodes.has(node_id): return ERR_ALREADY_EXISTS
++	_nodes[node_id] = position
++	_outgoing[node_id] = []
++	return OK
++
++func add_edge(edge: NavigationEdge) -> Error:
++	if edge == null or not edge.validation_errors().is_empty(): return ERR_INVALID_DATA
++	if _edges.has(edge.id): return ERR_ALREADY_EXISTS
++	if not _nodes.has(edge.from_node_id) or not _nodes.has(edge.to_node_id): return ERR_DOES_NOT_EXIST
++	_edges[edge.id] = edge
++	_outg
